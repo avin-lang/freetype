@@ -5,6 +5,8 @@ from files and from memory, glyphs loaded and rendered, kerning, raw SFNT tables
 named instances of variable fonts. The package binds FreeType's C library directly through Avin's C
 bindings, which check every binding against FreeType's own headers when the program is built.
 
+Needs Avin 0.0.18 or later.
+
 ## Installing FreeType
 
 The package finds FreeType with `pkg-config` (the module `freetype2`):
@@ -74,8 +76,14 @@ main(args: Vector[string])
   `FT_Err_*` constants (`cannotOpenResource`, `unknownFileFormat`, `invalidArgument`, `tableMissing`,
   …); `describe` and `errorString` put it in words.
 
-Not yet bound: the glyph bitmap's pixels, its pixel mode and the glyph format, which wait on field
-accessors that lend a view and answer an enumeration.
+The glyph slot's bitmap is read three ways: `bitmapRows`, `bitmapWidth`, `bitmapPitch` and
+`bitmapPixelMode` (a `PixelMode`, with `glyphFormat` a `GlyphFormat`); `bitmap()`, a view of
+`|pitch| * rows` bytes that is valid only until the face is used again; and `renderChar` and
+`renderIndex`, which answer a `Glyph` whose pixels are copied out, top row first, whatever the sign
+of the pitch. `boundingBox`, `sizeMetrics`, `glyphMetrics` and `advance` answer FreeType's own structs
+(`FT_BBox`, `FT_Size_Metrics`, `FT_Glyph_Metrics`, `FT_Vector`) read whole, in the units FreeType keeps
+them in (26.6 pixels for a size's and a glyph's measures); `charmapEncoding(i)` and `charmapEncodings()`
+answer each character map's `Encoding`.
 
 Libraries, faces and variation descriptors are handles on FreeType's counted objects, given back when
 they are collected or at once by `close()`. A face holds a reference on its library and a descriptor

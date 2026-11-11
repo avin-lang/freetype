@@ -19,6 +19,35 @@ data RenderMode
   // A signed distance field.
   Sdf
 
+// How a bitmap holds its pixels.
+@c(enum: "FT_Pixel_Mode", prefix: "FT_PIXEL_MODE_")
+data PixelMode
+  None
+  // One bit to a pixel, the leftmost in the high bit.
+  Mono
+  // One byte to a pixel: its coverage.
+  Gray
+  // Two bits to a pixel.
+  Gray2
+  // Four bits to a pixel.
+  Gray4
+  // Three bytes to a pixel, one for each horizontal subpixel.
+  Lcd
+  // Three rows to a pixel, one for each vertical subpixel.
+  LcdV
+  // Four bytes to a pixel, blue, green, red and alpha, premultiplied.
+  Bgra
+
+// What a glyph in a glyph slot is stored as.
+@c(enum: "FT_Glyph_Format", prefix: "FT_GLYPH_FORMAT_")
+data GlyphFormat
+  None
+  Composite
+  Bitmap
+  Outline
+  Plotter
+  Svg
+
 // What a kerning distance is measured in.
 @c(enum: "FT_Kerning_Mode", prefix: "FT_KERNING_")
 data KerningMode

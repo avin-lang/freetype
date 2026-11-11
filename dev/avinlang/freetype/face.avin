@@ -2,28 +2,70 @@ module dev.avinlang.freetype
 
 // Faces: one typeface of a font file, at a size, with the glyph slot its glyphs are loaded into and
 // rendered in.
+import avin.c.ByteView
 import avin.math
 
 // A distance FreeType measures, across and up: a kerning, or a glyph's advance.
 @c(struct: "FT_Vector")
 data Offset(x: long, y: long)
 
+// The box every glyph of a face fits in, in font units.
+@c(struct: "FT_BBox")
+data BBox(
+  @c("xMin") xMin: long,
+  @c("yMin") yMin: long,
+  @c("xMax") xMax: long,
+  @c("yMax") yMax: long
+)
+
 // The measures of the glyph last loaded, in 26.6 pixels (64 to a pixel), or in the font's own units
 // for a glyph loaded with `LoadFlags.noScale`.
+@c(struct: "FT_Glyph_Metrics")
 data GlyphMetrics(
   width: long,
   height: long,
-  horiBearingX: long,
-  horiBearingY: long,
-  horiAdvance: long,
-  vertBearingX: long,
-  vertBearingY: long,
-  vertAdvance: long
+  @c("horiBearingX") horiBearingX: long,
+  @c("horiBearingY") horiBearingY: long,
+  @c("horiAdvance") horiAdvance: long,
+  @c("vertBearingX") vertBearingX: long,
+  @c("vertBearingY") vertBearingY: long,
+  @c("vertAdvance") vertAdvance: long
 )
 
-// The measures of a face at the size it is set to, in pixels: the size in pixels across and down, the
-// ascender, the descender (negative, below the baseline), the line height and the widest advance.
-data SizeMetrics(xPpem: int, yPpem: int, ascender: real, descender: real, height: real, maxAdvance: real)
+// The measures of a face at the size it is set to: the size in pixels across and down, the scales
+// from font units to 26.6 pixels in 16.16 fixed point, and the ascender, the descender (negative,
+// below the baseline), the line height and the widest advance, in 26.6 pixels.
+@c(struct: "FT_Size_Metrics")
+data SizeMetrics(
+  xPpem: int,
+  yPpem: int,
+  xScale: long,
+  yScale: long,
+  ascender: long,
+  descender: long,
+  height: long,
+  maxAdvance: long
+)
+
+// A glyph rendered to a bitmap: `rows` rows of `width` pixels, `rowBytes` bytes to a row, top row
+// first, in `pixelMode`; placed `left` pixels right of the pen and with its top row `top` pixels above
+// the baseline; moving the pen `advance` pixels across.
+data Glyph(
+  index: int,
+  width: int,
+  rows: int,
+  rowBytes: int,
+  pixelMode: PixelMode,
+  left: int,
+  top: int,
+  advance: real,
+  pixels: Array[byte]
+)
+
+impl Glyph
+  // The byte of the pixel at `column` of `row`, counted from the top left: its coverage for a grey
+  // bitmap. Traps outside the bitmap.
+  at(row: int, column: int) -> byte = pixels(row * rowBytes + column)
 
 // A face: one typeface of a font, opened by `Library.openFace` or `openMemoryFace`. FreeType counts
 // its references; the handle holds one, and the face holds one on its library, so the library lives
@@ -97,16 +139,16 @@ class Face
   underlineThickness() -> int
 
   // The box every glyph fits in, in font units: left, bottom, right and top.
-  @c(field: "bbox.xMin")
-  private bboxXMin() -> long
-  @c(field: "bbox.yMin")
-  private bboxYMin() -> long
-  @c(field: "bbox.xMax")
-  private bboxXMax() -> long
-  @c(field: "bbox.yMax")
-  private bboxYMax() -> long
+  @c(field: "bbox")
+  boundingBox() -> BBox
 
-  boundingBox() -> (long, long, long, long) = (bboxXMin(), bboxYMin(), bboxXMax(), bboxYMax())
+  // The encoding of the face's character map at `index`, counted from 0. Stops the program for an
+  // index outside `0 ..< charmapCount()`.
+  @c(field: "charmaps[i]->encoding", bound: "self->num_charmaps")
+  charmapEncoding(i: int) -> Encoding
+
+  // The encodings of every character map the face has, in the face's order.
+  charmapEncodings() -> Vector[Encoding] = (0 ..< charmapCount()).map(i -> charmapEncoding(i)).toVector()
 
   // Whether the face is drawn from outlines, at any size.
   isScalable() -> bool = (flags() & faceFlagScalable) != 0
@@ -154,29 +196,9 @@ class Face
   setPixelSizes(width: int, height: int) -> Result[unit, FreeTypeError] =
     setPixelSizesRaw(width, height).mapErr(failed("FT_Set_Pixel_Sizes"))
 
-  @c(field: "size->metrics.x_ppem")
-  private xPpem() -> int
-  @c(field: "size->metrics.y_ppem")
-  private yPpem() -> int
-  @c(field: "size->metrics.ascender")
-  private sizeAscender() -> long
-  @c(field: "size->metrics.descender")
-  private sizeDescender() -> long
-  @c(field: "size->metrics.height")
-  private sizeHeight() -> long
-  @c(field: "size->metrics.max_advance")
-  private sizeMaxAdvance() -> long
-
   // The face's measures at the size it is set to.
-  sizeMetrics() -> SizeMetrics =
-    SizeMetrics(
-      xPpem(),
-      yPpem(),
-      pixels26(sizeAscender()),
-      pixels26(sizeDescender()),
-      pixels26(sizeHeight()),
-      pixels26(sizeMaxAdvance())
-    )
+  @c(field: "size->metrics")
+  sizeMetrics() -> SizeMetrics
 
   @c("FT_UInt FT_Get_Char_Index(FT_Face self, FT_ULong code)")
   private charIndexRaw(code: long) -> int
@@ -220,7 +242,7 @@ class Face
   selectCharmap(encoding: Encoding) -> Result[unit, FreeTypeError] =
     selectCharmapRaw(encoding).mapErr(failed("FT_Select_Charmap"))
 
-  @c("FT_UInt FT_Get_Name_Index(FT_Face self, const char *name)")
+  @c("FT_UInt FT_Get_Name_Index(FT_Face self, const FT_String *name)")
   private nameIndexRaw(name: string) -> int
 
   // The index of the glyph the face names `name`, such as `A` or `uni3042`; 0 for no such glyph, and
@@ -261,43 +283,17 @@ class Face
   @c(field: "glyph->glyph_index")
   glyphIndex() -> int
 
-  @c(field: "glyph->metrics.width")
-  private metricsWidth() -> long
-  @c(field: "glyph->metrics.height")
-  private metricsHeight() -> long
-  @c(field: "glyph->metrics.horiBearingX")
-  private metricsHoriBearingX() -> long
-  @c(field: "glyph->metrics.horiBearingY")
-  private metricsHoriBearingY() -> long
-  @c(field: "glyph->metrics.horiAdvance")
-  private metricsHoriAdvance() -> long
-  @c(field: "glyph->metrics.vertBearingX")
-  private metricsVertBearingX() -> long
-  @c(field: "glyph->metrics.vertBearingY")
-  private metricsVertBearingY() -> long
-  @c(field: "glyph->metrics.vertAdvance")
-  private metricsVertAdvance() -> long
+  // The format of the glyph in the slot: an outline until rendered, a bitmap after.
+  @c(field: "glyph->format")
+  glyphFormat() -> GlyphFormat
 
   // The measures of the glyph in the slot.
-  glyphMetrics() -> GlyphMetrics =
-    GlyphMetrics(
-      metricsWidth(),
-      metricsHeight(),
-      metricsHoriBearingX(),
-      metricsHoriBearingY(),
-      metricsHoriAdvance(),
-      metricsVertBearingX(),
-      metricsVertBearingY(),
-      metricsVertAdvance()
-    )
+  @c(field: "glyph->metrics")
+  glyphMetrics() -> GlyphMetrics
 
   // How far the glyph in the slot moves the pen, in 26.6 pixels.
-  @c(field: "glyph->advance.x")
-  private advanceX() -> long
-  @c(field: "glyph->advance.y")
-  private advanceY() -> long
-
-  advance() -> Offset = Offset(advanceX(), advanceY())
+  @c(field: "glyph->advance")
+  advance() -> Offset
 
   // The advance of the glyph in the slot unhinted and unrounded, in 16.16 pixels.
   @c(field: "glyph->linearHoriAdvance")
@@ -314,6 +310,10 @@ class Face
   @c(field: "glyph->bitmap.pitch")
   bitmapPitch() -> int
 
+  // How the slot's bitmap holds its pixels.
+  @c(field: "glyph->bitmap.pixel_mode")
+  bitmapPixelMode() -> PixelMode
+
   // How many levels of grey the slot's bitmap has: 256 for `Gray`.
   @c(field: "glyph->bitmap.num_grays")
   bitmapGrays() -> int
@@ -324,6 +324,48 @@ class Face
   bitmapLeft() -> int
   @c(field: "glyph->bitmap_top")
   bitmapTop() -> int
+
+  // The slot's bitmap, as FreeType holds it: `|pitch| * rows` bytes. `None` for a glyph with no
+  // pixels, such as a space. The view is valid until the face is used again.
+  @c(
+    field: "glyph->bitmap.buffer",
+    view,
+    length: "(self->glyph->bitmap.pitch < 0 ? -self->glyph->bitmap.pitch : self->glyph->bitmap.pitch) * self->glyph->bitmap.rows"
+  )
+  bitmap() -> Option[ByteView]
+
+  // The glyph in the slot, rendered in `mode` unless it is a bitmap already, copied out top row first
+  // whatever the sign of the pitch.
+  private copyGlyph(mode: RenderMode) -> Result[Glyph, FreeTypeError] =
+    if glyphFormat() != Bitmap then renderGlyph(mode)?
+    val (width, rows, pitch) = (bitmapWidth(), bitmapRows(), bitmapPitch())
+    val (left, top, advance, index) = (bitmapLeft(), bitmapTop(), pixels26(advance().x), glyphIndex())
+    val pixelMode = bitmapPixelMode()
+    val stride = if pitch < 0 then -pitch else pitch
+    val rowBytes = pixelMode match
+      PixelMode.Mono -> (width + 7) / 8
+      Gray2 -> (width + 3) / 4
+      Gray4 -> (width + 1) / 2
+      Bgra -> width * 4
+      _ -> width
+    val pixels = Buffer[byte]()
+    bitmap() match
+      Some(bits) ->
+        for r in 0 ..< rows
+          val row = if pitch > 0 then r else rows - 1 - r
+          pixels.appendAll(bits.slice(row * stride, row * stride + rowBytes))
+      None -> ()
+    Ok(Glyph(index, width, rows, rowBytes, pixelMode, left, top, advance, pixels.toArray()))
+
+  // The glyph of `c` rendered in `mode` at the face's size.
+  renderChar(c: char, mode: RenderMode = Normal, flags: LoadFlags = LoadFlags.default) -> Result[Glyph, FreeTypeError] =
+    loadChar(c, flags)?
+    copyGlyph(mode)
+
+  // The glyph at `index` rendered in `mode` at the face's size.
+  renderIndex(index: int, mode: RenderMode = Normal, flags: LoadFlags = LoadFlags.default) -> Result[Glyph, FreeTypeError] =
+    loadGlyph(index, flags)?
+    copyGlyph(mode)
 
   @c("FT_Error FT_Get_Kerning(FT_Face self, FT_UInt left, FT_UInt right, FT_Kerning_Mode mode, out FT_Vector *kerning)")
   private kerningRaw(left: int, right: int, mode: KerningMode) -> Result[Offset, int]

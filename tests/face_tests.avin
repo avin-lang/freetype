@@ -4,6 +4,7 @@ module tests
 // tables hold, and the files that are not fonts.
 import avin.fs
 import dev.avinlang.freetype.{
+  BBox,
   cannotOpenResource,
   faceFlagHorizontal,
   faceFlagKerning,
@@ -35,7 +36,7 @@ kaiseiMeasures()
   assertEq(face.descender(), -288)
   assertEq(face.height(), 1448)
   assertEq(face.maxAdvanceWidth(), 1000)
-  assertEq(face.boundingBox(), (-89, -209, 1053, 933))
+  assertEq(face.boundingBox(), BBox(-89, -209, 1053, 933))
   assertEq(face.underlineThickness(), 50)
   assertEq(face.underlinePosition(), -125)
 
@@ -66,7 +67,7 @@ ptSansFace()
   assertEq(face.unitsPerEm(), 1000)
   assertEq(face.ascender(), 1018)
   assertEq(face.descender(), -276)
-  assertEq(face.boundingBox(), (-355, -245, 1093, 993))
+  assertEq(face.boundingBox(), BBox(-355, -245, 1093, 993))
   assert(face.hasKerning())
   assert(!face.hasMultipleMasters())
 

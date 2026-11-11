@@ -1,0 +1,260 @@
+module tests
+
+// The glyph slot's bitmap read through a view bounded by `|pitch| * rows`, the pixel mode and the
+// glyph format read as enum mirrors, the character maps' encodings, and a glyph rendered by FreeType
+// compared pixel for pixel with a known rendering.
+import dev.avinlang.freetype.{
+  Bgra,
+  Glyph,
+  GlyphFormat,
+  Gray,
+  LoadFlags,
+  Outline,
+  PixelMode,
+  RenderMode,
+  Unicode
+}
+
+// PT Sans's `A` at 12 pixels, unhinted and rendered with 256 levels of grey, as FreeType draws it:
+// 7 pixels across, 9 rows, 0 pixels right of the pen and 9 above the baseline.
+private knownA() -> Vector[Vector[int]] =
+  [
+    [0, 0, 0, 88, 0, 0, 0],
+    [0, 0, 29, 251, 31, 0, 0],
+    [0, 0, 123, 191, 126, 0, 0],
+    [0, 0, 214, 57, 219, 0, 0],
+    [0, 58, 185, 0, 195, 61, 0],
+    [0, 154, 130, 48, 137, 157, 0],
+    [8, 228, 172, 172, 172, 235, 10],
+    [89, 158, 0, 0, 0, 174, 92],
+    [184, 66, 0, 0, 0, 79, 188]
+  ]
+
+// The same glyph rendered to one bit to a pixel, a byte to a row, the leftmost pixel the high bit.
+private knownAMono() -> Vector[int] = [16, 16, 48, 40, 40, 68, 124, 68, 130]
+
+private rowOf(g: Glyph, r: int) -> Vector[int] = (0 ..< g.rowBytes).map(c -> int(g.at(r, c))).toVector()
+
+private pixelsOf(g: Glyph) -> Vector[Vector[int]] = (0 ..< g.rows).map(r -> rowOf(g, r)).toVector()
+
+private val unhinted: LoadFlags = LoadFlags.noHinting
+
+@test("a glyph rendered by FreeType is the known rendering, pixel for pixel")
+knownRendering()
+  val face = sized(ptSansPath, 12)
+  val g = made(face.renderChar('A', RenderMode.Normal, unhinted))
+  assertEq((g.width, g.rows, g.rowBytes, g.left, g.top), (7, 9, 7, 0, 9))
+  assertEq(g.pixelMode, Gray)
+  assertEq(g.index, face.charIndex('A'))
+  assertEq(pixelsOf(g), knownA())
+  assertEq(g.pixels.length(), 63)
+
+@test("a glyph rendered to one bit a pixel is the known rendering, a byte to a row")
+knownMonoRendering()
+  val face = sized(ptSansPath, 12)
+  val g = made(face.renderChar('A', RenderMode.Mono, unhinted | LoadFlags.targetMono))
+  assertEq((g.width, g.rows, g.rowBytes), (7, 9, 1))
+  assertEq(g.pixelMode, PixelMode.Mono)
+  assertEq(pixelsOf(g).map(row -> row(0)), knownAMono())
+
+@test("the glyph is the same on every rendering of it, and the same by index as by character")
+renderingIsStable()
+  val face = sized(ptSansPath, 12)
+  val a = made(face.renderChar('A', RenderMode.Normal, unhinted))
+  assertEq(churn(), 6000)
+  val b = made(face.renderIndex(face.charIndex('A'), RenderMode.Normal, unhinted))
+  assertEq(a, b)
+  assertEq(pixelsOf(b), knownA())
+
+@test("the bitmap's view is |pitch| * rows bytes, and holds the pixels the copy has")
+bitmapView()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar('A', unhinted))
+  made(face.renderGlyph())
+  val (pitch, rows, width) = (face.bitmapPitch(), face.bitmapRows(), face.bitmapWidth())
+  val view = face.bitmap().get()
+  assertEq(view.length(), pitch * rows)
+  assert(pitch >= width)
+  val known = knownA()
+  for r in 0 ..< rows
+    for c in 0 ..< width
+      assertEq(int(view(r * pitch + c)), known(r)(c))
+
+@test("a glyph with no pixels has no bitmap view")
+spaceHasNoView()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar(' '))
+  made(face.renderGlyph())
+  assertEq(face.bitmap().isDefined(), false)
+  assertEq(face.bitmapRows(), 0)
+  val g = made(face.renderChar(' '))
+  assertEq((g.width, g.rows, g.pixels.length()), (0, 0, 0))
+  assert(g.advance > 0.0)
+
+@test("a glyph loaded and not rendered has no bitmap view; rendering gives it one")
+noViewBeforeRender()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar('A'))
+  assertEq(face.bitmap().isDefined(), false)
+  made(face.renderGlyph())
+  assert(face.bitmap().isDefined())
+
+@test("the view's bytes are replaced when another glyph is rendered")
+viewFollowsTheSlot()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar('A', unhinted))
+  made(face.renderGlyph())
+  val firstRows = face.bitmapRows()
+  val firstLength = face.bitmap().get().length()
+  made(face.loadChar('.', unhinted))
+  made(face.renderGlyph())
+  val secondRows = face.bitmapRows()
+  assertEq(face.bitmap().get().length(), face.bitmapPitch() * secondRows)
+  assert(secondRows < firstRows)
+  assert(firstLength > 0)
+
+@test(should_trap: "was closed when `Face` was used again")
+viewClosedWhenTheFaceIsUsed()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar('A', unhinted))
+  made(face.renderGlyph())
+  val view = face.bitmap().get()
+  assert(view.length() > 0)
+  face.bitmapRows()
+  view.length()
+
+@test("the glyph format is an outline once loaded and a bitmap once rendered")
+glyphFormats()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar('A'))
+  assertEq(face.glyphFormat(), Outline)
+  made(face.renderGlyph())
+  assertEq(face.glyphFormat(), GlyphFormat.Bitmap)
+  made(face.loadChar('A', LoadFlags.render))
+  assertEq(face.glyphFormat(), GlyphFormat.Bitmap)
+  made(face.loadChar('B', LoadFlags.noScale))
+  assertEq(face.glyphFormat(), Outline)
+
+@test("a face that has loaded no glyph has the format none")
+glyphFormatNone()
+  assertEq(sized(ptSansPath, 12).glyphFormat(), GlyphFormat.None)
+
+@test("each render mode has its own pixel mode, and its bitmap's size follows from it")
+pixelModes()
+  val face = sized(ptSansPath, 24)
+  val modes = [
+    (RenderMode.Normal, LoadFlags.default, Gray),
+    (RenderMode.Light, LoadFlags.targetLight, Gray),
+    (RenderMode.Mono, LoadFlags.targetMono, PixelMode.Mono),
+    (RenderMode.Lcd, LoadFlags.targetLcd, PixelMode.Lcd),
+    (RenderMode.LcdV, LoadFlags.targetLcdV, PixelMode.LcdV)
+  ]
+  for (mode, flags, expected) in modes
+    val g = made(face.renderChar('g', mode, flags))
+    assertEq(g.pixelMode, expected)
+    assertEq(g.pixels.length(), g.rows * g.rowBytes)
+    assert(g.rows > 0)
+    assert(g.width > 0)
+    assert(g.pixels.exists(b -> b != byte(0)))
+    assertEq(face.bitmapPixelMode(), expected)
+
+@test("one bit to a pixel packs eight to a byte, and the grey modes a byte each")
+rowBytesByMode()
+  val face = sized(ptSansPath, 24)
+  val mono = made(face.renderChar('W', RenderMode.Mono, LoadFlags.targetMono))
+  assertEq(mono.rowBytes, (mono.width + 7) / 8)
+  val grey = made(face.renderChar('W'))
+  assertEq(grey.rowBytes, grey.width)
+  val lcd = made(face.renderChar('W', RenderMode.Lcd, LoadFlags.targetLcd))
+  assertEq(lcd.rowBytes, lcd.width)
+  assertEq(lcd.width % 3, 0)
+  val lcdV = made(face.renderChar('W', RenderMode.LcdV, LoadFlags.targetLcdV))
+  assertEq(lcdV.rows % 3, 0)
+
+@test("the Bgra pixel mode is an enumerator a face may answer, and is not what a plain font draws")
+noColourBitmaps()
+  val face = sized(kaiseiPath, 32)
+  assert(made(face.renderChar('あ')).pixelMode != Bgra)
+
+@test("a kana and a kanji are rendered with pixels, top row first, from Kaisei Decol")
+kaiseiGlyphs()
+  val face = sized(kaiseiPath, 48)
+  for c in ['あ', '漢']
+    val g = made(face.renderChar(c))
+    assert(g.rows > 20)
+    assert(g.top > 0)
+    assert(g.pixels.exists(b -> int(b) > 200))
+    assertEq(g.pixelMode, Gray)
+    assertEq(g.advance, 48.0)
+
+@test("a bigger glyph has more rows, a wider advance and the same shape")
+glyphScale()
+  val small = made(sized(ptSansPath, 12).renderChar('A', RenderMode.Normal, unhinted))
+  val large = made(sized(ptSansPath, 48).renderChar('A', RenderMode.Normal, unhinted))
+  assert(large.rows > small.rows * 3)
+  assert(large.advance > small.advance * 3.0)
+  assert(7.0 <= small.advance <= 7.1)
+
+@test("a glyph from a face under collection is copied out whole")
+glyphCopyUnderChurn()
+  val face = sized(ptSansPath, 12)
+  made(face.loadChar('A', unhinted))
+  made(face.renderGlyph())
+  val view = face.bitmap().get()
+  assertEq(churn(), 6000)
+  assertEq(view.length(), 9 * face.bitmapPitch())
+  assertEq(pixelsOf(made(face.renderChar('A', RenderMode.Normal, unhinted))), knownA())
+
+@test("a face's character maps each have an encoding, and every bundled face has a Unicode one")
+charmapEncodings()
+  for path in [kaiseiPath, ptSansPath, quicksandPath]
+    val face = open(path)
+    val encodings = face.charmapEncodings()
+    assertEq(encodings.length(), face.charmapCount())
+    assert(encodings.contains(Unicode))
+    assertEq(face.charmapEncoding(0), encodings(0))
+
+@test(should_trap: "out of range")
+charmapEncodingPastTheEnd()
+  val face = ptSans()
+  face.charmapEncoding(face.charmapCount())
+
+@test(should_trap: "out of range")
+charmapEncodingNegative()
+  ptSans().charmapEncoding(-1)
+
+@test("the face's bounding box is a struct read whole, and the same on every read")
+boundingBoxWhole()
+  val face = ptSans()
+  val box = face.boundingBox()
+  assert(box.xMin < box.xMax)
+  assert(box.yMin < box.yMax)
+  assertEq(face.boundingBox(), box)
+
+@test("the size metrics are a struct read whole, in 26.6 pixels, and follow the size set")
+sizeMetricsWhole()
+  val face = ptSans()
+  made(face.setPixelSizes(0, 20))
+  val twenty = face.sizeMetrics()
+  assertEq((twenty.xPpem, twenty.yPpem), (20, 20))
+  assert(twenty.ascender > 0)
+  assert(twenty.descender < 0)
+  assert(twenty.height > twenty.ascender)
+  assert(twenty.maxAdvance > 0)
+  assert(twenty.xScale > 0)
+  made(face.setPixelSizes(0, 40))
+  val forty = face.sizeMetrics()
+  assertEq(forty.yPpem, 40)
+  assert(forty.ascender > twenty.ascender)
+  assert(forty.yScale > twenty.yScale)
+  assert(-2 <= forty.yScale - twenty.yScale * 2 <= 2)
+
+@test("the glyph's metrics and advance are structs read whole")
+glyphStructs()
+  val face = sized(ptSansPath, 16)
+  made(face.loadChar('A'))
+  val m = face.glyphMetrics()
+  val adv = face.advance()
+  assertEq(adv.x, m.horiAdvance)
+  assertEq(adv.y, 0)
+  assertEq(face.glyphMetrics(), m)
