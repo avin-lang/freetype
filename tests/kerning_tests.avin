@@ -1,0 +1,59 @@
+module tests
+
+// Kerning from a face's `kern` table, read through FreeType's `FT_Vector`, in each of its modes; and
+// the zeros of a face with no table.
+import dev.avinlang.freetype.{Default, Face, KerningMode, Offset, Unfitted, Unscaled}
+
+private pair(face: Face, left: char, right: char, mode: KerningMode) -> Offset =
+  made(face.kerning(face.charIndex(left), face.charIndex(right), mode))
+
+@test("PT Sans kerns A and V together, in font units, and not V and A the other way round by the same")
+ptSansUnscaled()
+  val face = ptSans()
+  val av = pair(face, 'A', 'V', Unscaled)
+  assert(av.x < 0)
+  assertEq(av.y, 0)
+  assertEq(pair(face, 'A', 'V', Unscaled), av)
+
+@test("a kerning scales with the size: unfitted to the 26.6 the font units make, fitted to whole pixels")
+ptSansScaled()
+  val face = sized(ptSansPath, 100)
+  val units = pair(face, 'A', 'V', Unscaled).x
+  val unfitted = pair(face, 'A', 'V', Unfitted).x
+  val fitted = pair(face, 'A', 'V', Default).x
+  assert(unfitted < 0)
+  assert(fitted < 0)
+  assertEq(fitted % 64, 0)
+  assert(unfitted - 64 < units * 64 * 100 / 1000)
+  assert(units * 64 * 100 / 1000 < unfitted + 64)
+  assert(fitted - 64 <= unfitted && unfitted <= fitted + 64)
+
+@test("a pair the table does not list kerns by nothing")
+ptSansUnlisted()
+  val face = ptSans()
+  assertEq(pair(face, 'H', 'H', Unscaled), Offset(0, 0))
+  assertEq(pair(face, ' ', ' ', Default), Offset(0, 0))
+
+@test("the missing glyph and the last glyph kern by nothing")
+ptSansEdges()
+  val face = ptSans()
+  val last = int(face.glyphCount()) - 1
+  assertEq(made(face.kerning(0, 0, Unscaled)), Offset(0, 0))
+  assertEq(made(face.kerning(last, last)).y, 0)
+
+@test("a face with no kern table kerns every pair by nothing, in every mode")
+kaiseiNoKerning()
+  val face = sized(kaiseiPath, 50)
+  assert(!face.hasKerning())
+  assertEq(pair(face, 'A', 'V', Default), Offset(0, 0))
+  assertEq(pair(face, 'A', 'V', Unfitted), Offset(0, 0))
+  assertEq(pair(face, 'A', 'V', Unscaled), Offset(0, 0))
+  assertEq(pair(face, 'あ', 'い', Default), Offset(0, 0))
+
+@test("kerning is read many times over while the collector runs")
+kerningUnderCollection()
+  val face = ptSans()
+  val expected = pair(face, 'A', 'V', Unscaled)
+  for i in 0 ..< 2000
+    assertEq(pair(face, 'A', 'V', Unscaled), expected)
+  assertEq(churn(), 6000)

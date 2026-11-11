@@ -1,0 +1,17 @@
+package {
+  name = "freetype"
+  version = "0.1.0"
+  description = "FreeType 2 for Avin: font faces from files and memory, glyphs rendered to bitmaps, kerning, SFNT tables and variations"
+}
+
+dependencies {
+}
+
+c-libraries {
+  freetype {
+    pkg-config = "freetype2"
+    headers    = ["<ft2build.h>", "FT_FREETYPE_H", "FT_MODULE_H", "FT_MULTIPLE_MASTERS_H",
+                  "FT_TRUETYPE_TABLES_H"]
+    install    = "FreeType 2: `brew install freetype`; Debian's libfreetype-dev"
+  }
+}

@@ -1,0 +1,126 @@
+module tests
+
+// The variation API: Quicksand's weight axis and named instances read through `FT_MM_Var`, design
+// coordinates set and read back, named instances chosen; and every call's error on a static font.
+import dev.avinlang.freetype.{MMVar, invalidArgument}
+
+private variations() -> MMVar = made(quicksand().mmVar())
+
+@test("Quicksand varies along one axis, weight, from 300 to 700 by default 300")
+quicksandAxis()
+  val mm = variations()
+  assertEq(mm.axisCount(), 1)
+  val wght = mm.axis(0)
+  assertEq(wght.tag, "wght")
+  assertEq(wght.name, "Weight")
+  assertEq(wght.minimum, 300.0)
+  assertEq(wght.default, 300.0)
+  assertEq(wght.maximum, 700.0)
+  assertEq(mm.axes(), [wght])
+
+@test("Quicksand's five named instances, Light to Bold, with their name ids")
+quicksandNamedStyles()
+  val mm = variations()
+  assertEq(mm.namedStyleCount(), 5)
+  val styles = mm.namedStyles()
+  assertEq(styles.length(), 5)
+  assertEq(styles.map(s -> s.coordinates), [[300.0], [400.0], [500.0], [600.0], [700.0]])
+  assertEq(styles.map(s -> s.nameId), [257, 258, 259, 260, 261])
+  assertEq(styles.map(s -> s.postscriptNameId), [262, 263, 264, 265, 266])
+  assertEq(mm.namedStyle(4), styles(4))
+  assertEq(mm.designCount(), long(65536) * 65536 - 1)
+
+@test(should_trap: "index")
+axisPastEnd()
+  variations().axis(1)
+
+@test(should_trap: "index")
+axisNegative()
+  variations().axis(-1)
+
+@test(should_trap: "index")
+namedStylePastEnd()
+  variations().namedStyle(5)
+
+@test("design coordinates set are read back, and the weight widens the glyphs")
+designCoordinates()
+  val face = sized(quicksandPath, 100)
+  made(face.loadChar('m'))
+  val light = face.advance().x
+  made(face.setDesignCoordinates([700.0].toArray()))
+  assertEq(made(face.designCoordinates(1)).toVector(), [700.0])
+  made(face.loadChar('m'))
+  assert(face.advance().x > light)
+  made(face.setDesignCoordinates([450.5].toArray()))
+  assertEq(made(face.designCoordinates(1)).toVector(), [450.5])
+
+// The advance of `m` at 100 pixels with the weight at `weight`.
+private mAdvanceAt(weight: real) -> long =
+  val face = sized(quicksandPath, 100)
+  made(face.setDesignCoordinates([weight].toArray()))
+  made(face.loadChar('m'))
+  face.advance().x
+
+@test("design coordinates outside the axis draw as its ends")
+designCoordinatesClamped()
+  assertEq(mAdvanceAt(2000), mAdvanceAt(700))
+  assertEq(mAdvanceAt(0), mAdvanceAt(300))
+  assertEq(mAdvanceAt(-50), mAdvanceAt(300))
+  assert(mAdvanceAt(700) > mAdvanceAt(500))
+
+@test("no design coordinates set every axis to its default")
+designCoordinatesNone()
+  val face = quicksand()
+  made(face.setDesignCoordinates([600.0].toArray()))
+  made(face.setDesignCoordinates(Array.empty[real]()))
+  assertEq(made(face.designCoordinates(1)).toVector(), [300.0])
+  assertEq(made(face.designCoordinates(0)).length(), 0)
+
+@test("a named instance sets the design coordinates to its own")
+namedInstances()
+  val face = quicksand()
+  assertEq(made(face.defaultNamedInstance()), 1)
+  made(face.setNamedInstance(5))
+  assertEq(made(face.designCoordinates(1)).toVector(), [700.0])
+  assertEq(face.index(), 5 * 65536)
+  made(face.setNamedInstance(3))
+  assertEq(made(face.designCoordinates(1)).toVector(), [500.0])
+  assertEq(face.index(), 3 * 65536)
+  made(face.setNamedInstance(0))
+  assertEq(face.index(), 0)
+
+@test("a named instance past the last is Err, invalid-argument")
+namedInstancePastEnd()
+  val r = quicksand().setNamedInstance(6)
+  assertEq(code(r), invalidArgument)
+  assertEq(call(r), "FT_Set_Named_Instance")
+
+@test("a static font has no variations: FT_Get_MM_Var is Err, invalid-argument")
+staticMmVar()
+  val r = kaisei().mmVar()
+  assertEq(code(r), invalidArgument)
+  assertEq(call(r), "FT_Get_MM_Var")
+
+@test("a static font's design coordinates can be neither set nor read")
+staticDesignCoordinates()
+  val face = kaisei()
+  val set = face.setDesignCoordinates([400.0].toArray())
+  assertEq(code(set), invalidArgument)
+  assertEq(call(set), "FT_Set_Var_Design_Coordinates")
+  val get = face.designCoordinates(1)
+  assertEq(code(get), invalidArgument)
+  assertEq(call(get), "FT_Get_Var_Design_Coordinates")
+
+@test("a static font has no named instances")
+staticNamedInstances()
+  val face = kaisei()
+  assertEq(code(face.setNamedInstance(1)), invalidArgument)
+  assertEq(code(face.defaultNamedInstance()), invalidArgument)
+  assertEq(call(face.defaultNamedInstance()), "FT_Get_Default_Named_Instance")
+
+@test("the static font's error leaves the face usable")
+staticFaceStillWorks()
+  val face = sized(kaiseiPath, 20)
+  assert(face.mmVar().isErr())
+  made(face.loadChar('あ'))
+  assert(face.advance().x > 0)

@@ -1,0 +1,66 @@
+module dev.avinlang.freetype
+
+// A variable font's design space: its axes, such as weight, and its named instances, such as Bold.
+
+// One axis of a variable font: its name, its four-character tag (`wght` for weight), and the least,
+// default and greatest values it takes, in its own units.
+data Axis(name: string, tag: string, minimum: real, default: real, maximum: real)
+
+// One named instance of a variable font: its coordinates, one for each axis, and the ids of the names
+// the font's `name` table gives it and its PostScript name (0xFFFF for none).
+data NamedStyle(coordinates: Vector[real], nameId: int, postscriptNameId: int)
+
+// FreeType's description of a face's variations, read once and given back through the face's library.
+// It keeps its face, and through the face the library, until it is given back.
+@c(type: "FT_MM_Var *", kept: "face: Face", release: "FT_Done_MM_Var(face->glyph->library, self)")
+class MMVar
+  // How many axes the face varies along.
+  @c(field: "num_axis")
+  axisCount() -> int
+
+  // How many designs an Adobe multiple-master face blends between; 4294967295, FreeType's `~0U`, for
+  // a TrueType or OpenType variable face, which has none.
+  @c(field: "num_designs")
+  designCount() -> long
+
+  // How many named instances the face has.
+  @c(field: "num_namedstyles")
+  namedStyleCount() -> int
+
+  @c(field: "axis[i].name", bound: "self->num_axis")
+  private axisName(i: int) -> string
+  @c(field: "axis[i].tag", bound: "self->num_axis")
+  private axisTag(i: int) -> long
+  @c(field: "axis[i].minimum", bound: "self->num_axis")
+  private axisMinimum(i: int) -> long
+  @c(field: "axis[i].def", bound: "self->num_axis")
+  private axisDefault(i: int) -> long
+  @c(field: "axis[i].maximum", bound: "self->num_axis")
+  private axisMaximum(i: int) -> long
+
+  // The axis at `i`, from 0. Traps outside `0 ..< axisCount()`.
+  axis(i: int) -> Axis =
+    Axis(axisName(i), tagText(axisTag(i)), real16(axisMinimum(i)), real16(axisDefault(i)), real16(axisMaximum(i)))
+
+  // Every axis, in the face's order.
+  axes() -> Vector[Axis] = (0 ..< axisCount()).map(axis).toVector()
+
+  @c(field: "namedstyle[i].coords[j]", bound: ["self->num_namedstyles", "self->num_axis"])
+  private styleCoordinate(i: int, j: int) -> long
+  @c(field: "namedstyle[i].strid", bound: "self->num_namedstyles")
+  private styleNameId(i: int) -> int
+  @c(field: "namedstyle[i].psid", bound: "self->num_namedstyles")
+  private stylePostscriptId(i: int) -> int
+
+  // The named instance at `i`, from 0; it is instance `i + 1` to `Face.setNamedInstance`. Traps
+  // outside `0 ..< namedStyleCount()`.
+  namedStyle(i: int) -> NamedStyle =
+    val coords = (0 ..< axisCount()).map(j -> real16(styleCoordinate(i, j))).toVector()
+    NamedStyle(coords, styleNameId(i), stylePostscriptId(i))
+
+  // Every named instance, in the face's order.
+  namedStyles() -> Vector[NamedStyle] = (0 ..< namedStyleCount()).map(namedStyle).toVector()
+
+// The four characters of a tag `FT_MAKE_TAG` packed.
+private tagText(tag: long) -> string =
+  string.fromUtf8Lossy([24, 16, 8, 0].map(shift -> byte(int((tag >> long(shift)) & long(255)))).toArray())

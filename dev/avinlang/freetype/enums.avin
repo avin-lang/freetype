@@ -1,0 +1,199 @@
+module dev.avinlang.freetype
+
+// FreeType's enumerations, mirrored as types of variants, and its error codes and flags, as
+// constants measured from its headers.
+
+// How a glyph's outline is turned into pixels.
+@c(enum: "FT_Render_Mode", prefix: "FT_RENDER_MODE_")
+data RenderMode
+  // Eight-bit coverage, 256 levels of grey.
+  Normal
+  // Eight-bit coverage, hinted lightly: vertically only.
+  Light
+  // One bit to a pixel.
+  Mono
+  // Coverage for horizontal subpixels: three bytes to a pixel.
+  Lcd
+  // Coverage for vertical subpixels: three rows to a pixel.
+  LcdV
+  // A signed distance field.
+  Sdf
+
+// What a kerning distance is measured in.
+@c(enum: "FT_Kerning_Mode", prefix: "FT_KERNING_")
+data KerningMode
+  // Scaled and rounded to whole pixels, in 26.6.
+  Default
+  // Scaled and not rounded, in 26.6.
+  Unfitted
+  // In the font's own units.
+  Unscaled
+
+// The encoding of a face's character map.
+@c(enum: "FT_Encoding", prefix: "FT_ENCODING_")
+data Encoding
+  None
+  MsSymbol
+  Unicode
+  Sjis
+  Prc
+  Big5
+  Wansung
+  Johab
+  AdobeStandard
+  AdobeExpert
+  AdobeCustom
+  @c("FT_ENCODING_ADOBE_LATIN_1")
+  AdobeLatin1
+  @c("FT_ENCODING_OLD_LATIN_2")
+  OldLatin2
+  AppleRoman
+
+// FreeType's error codes: what a `Failed` holds.
+@c(const: "FT_Err_Ok")
+val ok: int
+@c(const: "FT_Err_Cannot_Open_Resource")
+val cannotOpenResource: int
+@c(const: "FT_Err_Unknown_File_Format")
+val unknownFileFormat: int
+@c(const: "FT_Err_Invalid_File_Format")
+val invalidFileFormat: int
+@c(const: "FT_Err_Invalid_Version")
+val invalidVersion: int
+@c(const: "FT_Err_Invalid_Argument")
+val invalidArgument: int
+@c(const: "FT_Err_Unimplemented_Feature")
+val unimplementedFeature: int
+@c(const: "FT_Err_Invalid_Table")
+val invalidTable: int
+@c(const: "FT_Err_Invalid_Glyph_Index")
+val invalidGlyphIndex: int
+@c(const: "FT_Err_Invalid_Character_Code")
+val invalidCharacterCode: int
+@c(const: "FT_Err_Invalid_Glyph_Format")
+val invalidGlyphFormat: int
+@c(const: "FT_Err_Cannot_Render_Glyph")
+val cannotRenderGlyph: int
+@c(const: "FT_Err_Invalid_Pixel_Size")
+val invalidPixelSize: int
+@c(const: "FT_Err_Invalid_Handle")
+val invalidHandle: int
+@c(const: "FT_Err_Invalid_Face_Handle")
+val invalidFaceHandle: int
+@c(const: "FT_Err_Out_Of_Memory")
+val outOfMemory: int
+@c(const: "FT_Err_Table_Missing")
+val tableMissing: int
+
+// What a face is and has, as `Face.flags()` answers them.
+@c(const: "FT_FACE_FLAG_SCALABLE")
+val faceFlagScalable: long
+@c(const: "FT_FACE_FLAG_FIXED_SIZES")
+val faceFlagFixedSizes: long
+@c(const: "FT_FACE_FLAG_FIXED_WIDTH")
+val faceFlagFixedWidth: long
+@c(const: "FT_FACE_FLAG_SFNT")
+val faceFlagSfnt: long
+@c(const: "FT_FACE_FLAG_HORIZONTAL")
+val faceFlagHorizontal: long
+@c(const: "FT_FACE_FLAG_VERTICAL")
+val faceFlagVertical: long
+@c(const: "FT_FACE_FLAG_KERNING")
+val faceFlagKerning: long
+@c(const: "FT_FACE_FLAG_MULTIPLE_MASTERS")
+val faceFlagMultipleMasters: long
+@c(const: "FT_FACE_FLAG_GLYPH_NAMES")
+val faceFlagGlyphNames: long
+@c(const: "FT_FACE_FLAG_HINTER")
+val faceFlagHinter: long
+@c(const: "FT_FACE_FLAG_COLOR")
+val faceFlagColor: long
+@c(const: "FT_FACE_FLAG_VARIATION")
+val faceFlagVariation: long
+
+// A face's style, as `Face.styleFlags()` answers it.
+@c(const: "FT_STYLE_FLAG_ITALIC")
+val styleFlagItalic: long
+@c(const: "FT_STYLE_FLAG_BOLD")
+val styleFlagBold: long
+
+@c(const: "FT_LOAD_DEFAULT")
+private val ftLoadDefault: int
+@c(const: "FT_LOAD_NO_SCALE")
+private val ftLoadNoScale: int
+@c(const: "FT_LOAD_NO_HINTING")
+private val ftLoadNoHinting: int
+@c(const: "FT_LOAD_RENDER")
+private val ftLoadRender: int
+@c(const: "FT_LOAD_NO_BITMAP")
+private val ftLoadNoBitmap: int
+@c(const: "FT_LOAD_VERTICAL_LAYOUT")
+private val ftLoadVerticalLayout: int
+@c(const: "FT_LOAD_FORCE_AUTOHINT")
+private val ftLoadForceAutohint: int
+@c(const: "FT_LOAD_PEDANTIC")
+private val ftLoadPedantic: int
+@c(const: "FT_LOAD_NO_RECURSE")
+private val ftLoadNoRecurse: int
+@c(const: "FT_LOAD_IGNORE_TRANSFORM")
+private val ftLoadIgnoreTransform: int
+@c(const: "FT_LOAD_MONOCHROME")
+private val ftLoadMonochrome: int
+@c(const: "FT_LOAD_LINEAR_DESIGN")
+private val ftLoadLinearDesign: int
+@c(const: "FT_LOAD_NO_AUTOHINT")
+private val ftLoadNoAutohint: int
+@c(const: "FT_LOAD_COLOR")
+private val ftLoadColor: int
+@c(const: "FT_LOAD_COMPUTE_METRICS")
+private val ftLoadComputeMetrics: int
+@c(const: "FT_LOAD_BITMAP_METRICS_ONLY")
+private val ftLoadBitmapMetricsOnly: int
+@c(const: "FT_LOAD_TARGET_NORMAL")
+private val ftLoadTargetNormal: int
+@c(const: "FT_LOAD_TARGET_LIGHT")
+private val ftLoadTargetLight: int
+@c(const: "FT_LOAD_TARGET_MONO")
+private val ftLoadTargetMono: int
+@c(const: "FT_LOAD_TARGET_LCD")
+private val ftLoadTargetLcd: int
+@c(const: "FT_LOAD_TARGET_LCD_V")
+private val ftLoadTargetLcdV: int
+
+// How a glyph is loaded: FreeType's `FT_LOAD_*` flags, combined with `|`. `LoadFlags.default` is
+// none of them.
+data LoadFlags(bits: int)
+
+impl LoadFlags
+  // Both flags' bits.
+  |(other: LoadFlags) -> LoadFlags = LoadFlags(bits | other.bits)
+
+  // Whether every bit of `other` is set here.
+  contains(other: LoadFlags) -> bool = (bits & other.bits) == other.bits
+
+object LoadFlags
+  // Scaled to the face's size, hinted, and not rendered.
+  val default: LoadFlags = LoadFlags(ftLoadDefault)
+  // In the font's own units, unhinted and unscaled.
+  val noScale: LoadFlags = LoadFlags(ftLoadNoScale)
+  val noHinting: LoadFlags = LoadFlags(ftLoadNoHinting)
+  // Rendered to a bitmap as it is loaded, in the target's render mode.
+  val render: LoadFlags = LoadFlags(ftLoadRender)
+  val noBitmap: LoadFlags = LoadFlags(ftLoadNoBitmap)
+  val verticalLayout: LoadFlags = LoadFlags(ftLoadVerticalLayout)
+  val forceAutohint: LoadFlags = LoadFlags(ftLoadForceAutohint)
+  val pedantic: LoadFlags = LoadFlags(ftLoadPedantic)
+  val noRecurse: LoadFlags = LoadFlags(ftLoadNoRecurse)
+  val ignoreTransform: LoadFlags = LoadFlags(ftLoadIgnoreTransform)
+  val monochrome: LoadFlags = LoadFlags(ftLoadMonochrome)
+  val linearDesign: LoadFlags = LoadFlags(ftLoadLinearDesign)
+  val noAutohint: LoadFlags = LoadFlags(ftLoadNoAutohint)
+  val color: LoadFlags = LoadFlags(ftLoadColor)
+  val computeMetrics: LoadFlags = LoadFlags(ftLoadComputeMetrics)
+  val bitmapMetricsOnly: LoadFlags = LoadFlags(ftLoadBitmapMetricsOnly)
+  // The hinting each render mode is made for.
+  val targetNormal: LoadFlags = LoadFlags(ftLoadTargetNormal)
+  val targetLight: LoadFlags = LoadFlags(ftLoadTargetLight)
+  val targetMono: LoadFlags = LoadFlags(ftLoadTargetMono)
+  val targetLcd: LoadFlags = LoadFlags(ftLoadTargetLcd)
+  val targetLcdV: LoadFlags = LoadFlags(ftLoadTargetLcdV)

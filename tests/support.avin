@@ -1,0 +1,77 @@
+module tests
+
+// What the tests share: the bundled fonts, a library and faces opened from them, and readers of the
+// results FreeType answers. The fonts are Kaisei Decol Regular (static, Japanese and Latin), PT Sans
+// (a `kern` table) and Quicksand (variable along its weight), each with its SIL Open Font License
+// beside it under `tests/fonts`.
+import avin.c.ByteBlock
+import avin.fs
+import dev.avinlang.freetype.{Face, Failed, FreeTypeError, Library, library}
+
+val kaiseiPath = "tests/fonts/kaisei-decol/KaiseiDecol-Regular.ttf"
+val ptSansPath = "tests/fonts/pt-sans/PT_Sans-Web-Regular.ttf"
+val quicksandPath = "tests/fonts/quicksand/Quicksand[wght].ttf"
+
+// The value of a result the test expects to succeed.
+made[T](r: Result[T, FreeTypeError]) -> T = r match
+  Ok(v) -> v
+  Err(e) -> fail(s"FreeType failed: $e")
+
+// The error code of a result the test expects to fail.
+code[T](r: Result[T, FreeTypeError]) -> int = r match
+  Ok(_) -> fail("FreeType succeeded")
+  Err(Failed(_, c)) -> c
+
+// The call named by a result the test expects to fail.
+call[T](r: Result[T, FreeTypeError]) -> string = r match
+  Ok(_) -> fail("FreeType succeeded")
+  Err(Failed(name, _)) -> name
+
+// A new library.
+lib() -> Library = made(library())
+
+// The face of the font at `path`, opened through a library of its own.
+open(path: string) -> Face = made(lib().openFace(path))
+
+kaisei() -> Face = open(kaiseiPath)
+ptSans() -> Face = open(ptSansPath)
+quicksand() -> Face = open(quicksandPath)
+
+// The face of `path` at `pixels` pixels high.
+sized(path: string, pixels: int) -> Face =
+  val face = open(path)
+  made(face.setPixelSizes(0, pixels))
+  face
+
+// The bytes of the file at `path`.
+bytesOf(path: string) -> Array[byte] = fs.readBytes(path).getOrElse(fail(s"cannot read $path"))
+
+// The bytes of the file at `path` in a block of memory C may keep.
+blockOf(path: string) -> ByteBlock = blockOfBytes(bytesOf(path))
+
+// `bytes` copied into a new block.
+blockOfBytes(bytes: Array[byte]) -> ByteBlock =
+  val block = ByteBlock(bytes.length())
+  block.write(0, bytes)
+  block
+
+// A new, empty directory for one test's files.
+scratch() -> string = fs.createTempDir("avin-freetype").getOrElse(fail("no temporary directory"))
+
+// Enough allocation for the collector to run, under stress or not: 6000, the elements allocated.
+churn() -> int =
+  var total = 0
+  for i in 0 ..< 2000
+    total += [i, i + 1, i + 2].length()
+  total
+
+// The big-endian 16-bit number at `at`, unsigned.
+u16(bytes: Array[byte], at: int) -> int = int(bytes(at)) * 256 + int(bytes(at + 1))
+
+// The big-endian 16-bit number at `at`, signed.
+i16(bytes: Array[byte], at: int) -> int =
+  val n = u16(bytes, at)
+  if n >= 32768 then n - 65536 else n
+
+// The big-endian 32-bit number at `at`, unsigned.
+u32(bytes: Array[byte], at: int) -> long = long(u16(bytes, at)) * 65536 + long(u16(bytes, at + 2))

@@ -1,0 +1,141 @@
+module tests
+
+// Faces opened from files: what FreeType reads of each bundled font, compared with the numbers its
+// tables hold, and the files that are not fonts.
+import avin.fs
+import dev.avinlang.freetype.{
+  cannotOpenResource,
+  faceFlagHorizontal,
+  faceFlagKerning,
+  faceFlagScalable,
+  faceFlagSfnt,
+  invalidArgument,
+  styleFlagBold,
+  styleFlagItalic,
+  unknownFileFormat
+}
+
+@test("Kaisei Decol's names, counts and index")
+kaiseiNames()
+  val face = kaisei()
+  assertEq(face.familyName(), Some("Kaisei Decol"))
+  assertEq(face.styleName(), Some("Regular"))
+  assertEq(face.postscriptName(), Some("KaiseiDecol-Regular"))
+  assertEq(face.faceCount(), 1)
+  assertEq(face.index(), 0)
+  assertEq(face.glyphCount(), 9368)
+  assertEq(face.fixedSizeCount(), 0)
+  assert(face.charmapCount() >= 1)
+
+@test("Kaisei Decol's measures in font units, as its head, hhea and post tables hold them")
+kaiseiMeasures()
+  val face = kaisei()
+  assertEq(face.unitsPerEm(), 1000)
+  assertEq(face.ascender(), 1160)
+  assertEq(face.descender(), -288)
+  assertEq(face.height(), 1448)
+  assertEq(face.maxAdvanceWidth(), 1000)
+  assertEq(face.boundingBox(), (-89, -209, 1053, 933))
+  assertEq(face.underlineThickness(), 50)
+  assertEq(face.underlinePosition(), -125)
+
+@test("Kaisei Decol is a scalable, horizontal SFNT face, upright and regular, with no kern table")
+kaiseiFlags()
+  val face = kaisei()
+  assert(face.isScalable())
+  assert(face.isSfnt())
+  assert((face.flags() & faceFlagScalable) != 0)
+  assert((face.flags() & faceFlagSfnt) != 0)
+  assert((face.flags() & faceFlagHorizontal) != 0)
+  assert(!face.hasKerning())
+  assert((face.flags() & faceFlagKerning) == 0)
+  assert(!face.hasMultipleMasters())
+  assert(!face.isFixedWidth())
+  assert(face.hasGlyphNames())
+  assert(!face.isItalic())
+  assert(!face.isBold())
+  assertEq(face.styleFlags() & (styleFlagItalic | styleFlagBold), 0)
+  assertEq(face.namedInstanceCount(), 0)
+
+@test("PT Sans's names and measures, and its kern table")
+ptSansFace()
+  val face = ptSans()
+  assertEq(face.familyName(), Some("PT Sans"))
+  assertEq(face.styleName(), Some("Regular"))
+  assertEq(face.glyphCount(), 720)
+  assertEq(face.unitsPerEm(), 1000)
+  assertEq(face.ascender(), 1018)
+  assertEq(face.descender(), -276)
+  assertEq(face.boundingBox(), (-355, -245, 1093, 993))
+  assert(face.hasKerning())
+  assert(!face.hasMultipleMasters())
+
+@test("Quicksand is variable, with its named instances counted in its style flags")
+quicksandFace()
+  val face = quicksand()
+  assertEq(face.familyName(), Some("Quicksand"))
+  assertEq(face.glyphCount(), 812)
+  assert(face.hasMultipleMasters())
+  assertEq(face.namedInstanceCount(), 5)
+  assertEq(face.index(), 0)
+
+@test("a named instance is opened by its number in the upper 16 bits of the index")
+quicksandNamedInstanceIndex()
+  val face = made(lib().openFace(quicksandPath, 5 * 65536))
+  assertEq(face.index(), 5 * 65536)
+  assertEq(face.styleName(), Some("Bold"))
+
+@test("a missing file is Err, FreeType's cannot-open-resource, from FT_New_Face")
+missingFile()
+  val r = lib().openFace(s"${scratch()}/missing.ttf")
+  assertEq(code(r), cannotOpenResource)
+  assertEq(call(r), "FT_New_Face")
+
+@test("a directory is not a font file")
+directoryIsNoFont()
+  assert(code(lib().openFace(scratch())) != 0)
+
+@test("a file of text is Err, FreeType's unknown-file-format")
+textFile()
+  val path = s"${scratch()}/not-a-font.ttf"
+  assert(fs.writeText(path, "This is not a font, though its name says it is.\n").isOk())
+  assertEq(code(lib().openFace(path)), unknownFileFormat)
+
+@test("an empty file is Err, FreeType's unknown-file-format")
+emptyFile()
+  val path = s"${scratch()}/empty.ttf"
+  assert(fs.writeText(path, "").isOk())
+  assertEq(code(lib().openFace(path)), unknownFileFormat)
+
+@test("a font cut short is Err")
+truncatedFont()
+  val path = s"${scratch()}/short.ttf"
+  assert(fs.writeBytes(path, bytesOf(kaiseiPath).slice(0, 100)).isOk())
+  assert(code(lib().openFace(path)) != 0)
+
+@test("an index past the file's faces is Err, FreeType's invalid-argument")
+indexPastFaces()
+  assertEq(code(lib().openFace(kaiseiPath, 1)), invalidArgument)
+  assertEq(code(lib().openFace(kaiseiPath, 99)), invalidArgument)
+
+@test("a path holding non-ASCII characters is passed as UTF-8")
+unicodePath()
+  val path = s"${scratch()}/かいせい-é.ttf"
+  assert(fs.writeBytes(path, bytesOf(ptSansPath)).isOk())
+  assertEq(made(lib().openFace(path)).familyName(), Some("PT Sans"))
+
+@test(should_trap: "holds a NUL")
+pathWithNul()
+  lib().openFace("tests/fonts\u{0}/x.ttf")
+
+@test(should_trap: "`Face` is closed")
+faceUsedAfterClose()
+  val face = kaisei()
+  face.close()
+  face.glyphCount()
+
+@test("closing a face twice is harmless")
+faceClosedTwice()
+  val face = kaisei()
+  face.close()
+  face.close()

@@ -1,0 +1,101 @@
+module tests
+
+// Faces opened from memory: the same face as from the file, the block it reads kept alive by it, and
+// bytes that are not a font.
+import avin.c.ByteBlock
+import dev.avinlang.freetype.{Face, invalidArgument, invalidFileFormat}
+
+@test("the same face opened from memory has the file's names, counts and measures")
+sameFaceFromMemory()
+  val l = lib()
+  val fromFile = made(l.openFace(kaiseiPath))
+  val fromMemory = made(l.openMemoryFace(blockOf(kaiseiPath)))
+  assertEq(fromMemory.familyName(), fromFile.familyName())
+  assertEq(fromMemory.styleName(), fromFile.styleName())
+  assertEq(fromMemory.postscriptName(), fromFile.postscriptName())
+  assertEq(fromMemory.glyphCount(), fromFile.glyphCount())
+  assertEq(fromMemory.unitsPerEm(), fromFile.unitsPerEm())
+  assertEq(fromMemory.boundingBox(), fromFile.boundingBox())
+  assertEq(fromMemory.flags(), fromFile.flags())
+  assertEq(fromMemory.charIndex('あ'), fromFile.charIndex('あ'))
+
+@test("a glyph loaded and rendered from memory measures as the file's")
+sameGlyphFromMemory()
+  val fromFile = sized(kaiseiPath, 48)
+  val fromMemory = made(lib().openMemoryFace(blockOf(kaiseiPath)))
+  made(fromMemory.setPixelSizes(0, 48))
+  for c in ['A', 'あ', '漢', ' ']
+    made(fromFile.loadChar(c))
+    made(fromFile.renderGlyph())
+    made(fromMemory.loadChar(c))
+    made(fromMemory.renderGlyph())
+    assertEq(fromMemory.glyphMetrics(), fromFile.glyphMetrics())
+    assertEq(fromMemory.bitmapRows(), fromFile.bitmapRows())
+    assertEq(fromMemory.bitmapWidth(), fromFile.bitmapWidth())
+    assertEq(fromMemory.bitmapLeft(), fromFile.bitmapLeft())
+    assertEq(fromMemory.bitmapTop(), fromFile.bitmapTop())
+
+@test("the head table read from memory is the file's")
+tablesFromMemory()
+  val face = made(lib().openMemoryFace(blockOf(kaiseiPath)))
+  assertEq(made(face.sfntTable("head")).toVector(), made(kaisei().sfntTable("head")).toVector())
+
+// The bytes of `text` in a block.
+private blockOfText(text: string) -> ByteBlock = blockOfBytes(Array.tabulate(text.byteLength(), i -> text.byteAt(i)))
+
+// A face over a block of its own, with no other reference to the block left.
+private memoryFace(path: string) -> Face = made(lib().openMemoryFace(blockOf(path)))
+
+@test("a face keeps the block it reads, though nothing else reaches it, while the collector runs")
+faceKeepsBlock()
+  val face = memoryFace(kaiseiPath)
+  assertEq(churn(), 6000)
+  made(face.setPixelSizes(0, 64))
+  for c in ['漢', '字', 'か', 'な']
+    assertEq(churn(), 6000)
+    made(face.loadChar(c))
+    made(face.renderGlyph())
+    assert(face.bitmapRows() > 0)
+
+@test("a block written after the face is opened is what the face reads from then on")
+blockSharedWithFace()
+  val block = blockOf(ptSansPath)
+  val face = made(lib().openMemoryFace(block))
+  assertEq(face.familyName(), Some("PT Sans"))
+  assertEq(block.length(), bytesOf(ptSansPath).length())
+
+@test("bytes that are not a font are Err, invalid-file-format, from FT_New_Memory_Face")
+notAFontInMemory()
+  val r = lib().openMemoryFace(blockOfText("not a font at all"))
+  assertEq(code(r), invalidFileFormat)
+  assertEq(call(r), "FT_New_Memory_Face")
+
+@test("an empty block and zeroed bytes are not fonts")
+emptyAndZeroBlocks()
+  assert(code(lib().openMemoryFace(ByteBlock(0))) != 0)
+  assert(code(lib().openMemoryFace(ByteBlock())) != 0)
+  assertEq(code(lib().openMemoryFace(ByteBlock(4096))), invalidFileFormat)
+
+@test("a font cut short in memory is Err")
+truncatedInMemory()
+  assert(code(lib().openMemoryFace(blockOfBytes(bytesOf(kaiseiPath).slice(0, 12)))) != 0)
+
+@test("an index past the faces in memory is Err, invalid-argument")
+memoryIndexPastFaces()
+  assertEq(code(lib().openMemoryFace(blockOf(ptSansPath), 1)), invalidArgument)
+
+@test("one block is read by two faces at once")
+oneBlockTwoFaces()
+  val block = blockOf(ptSansPath)
+  val l = lib()
+  val a = made(l.openMemoryFace(block))
+  val b = made(l.openMemoryFace(block))
+  assert(a !== b)
+  made(a.setPixelSizes(0, 20))
+  made(b.setPixelSizes(0, 60))
+  made(a.loadChar('W'))
+  made(b.loadChar('W'))
+  assert(b.glyphMetrics().horiAdvance > a.glyphMetrics().horiAdvance)
+  a.close()
+  made(b.loadChar('Q'))
+  assertEq(b.glyphIndex(), b.charIndex('Q'))

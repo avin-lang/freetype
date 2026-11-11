@@ -1,0 +1,415 @@
+module dev.avinlang.freetype
+
+// Faces: one typeface of a font file, at a size, with the glyph slot its glyphs are loaded into and
+// rendered in.
+import avin.math
+
+// A distance FreeType measures, across and up: a kerning, or a glyph's advance.
+@c(struct: "FT_Vector")
+data Offset(x: long, y: long)
+
+// The measures of the glyph last loaded, in 26.6 pixels (64 to a pixel), or in the font's own units
+// for a glyph loaded with `LoadFlags.noScale`.
+data GlyphMetrics(
+  width: long,
+  height: long,
+  horiBearingX: long,
+  horiBearingY: long,
+  horiAdvance: long,
+  vertBearingX: long,
+  vertBearingY: long,
+  vertAdvance: long
+)
+
+// The measures of a face at the size it is set to, in pixels: the size in pixels across and down, the
+// ascender, the descender (negative, below the baseline), the line height and the widest advance.
+data SizeMetrics(xPpem: int, yPpem: int, ascender: real, descender: real, height: real, maxAdvance: real)
+
+// A face: one typeface of a font, opened by `Library.openFace` or `openMemoryFace`. FreeType counts
+// its references; the handle holds one, and the face holds one on its library, so the library lives
+// at least as long as any face opened through it. The face has one glyph slot, which every load
+// replaces: what is read of a glyph is read of the last one loaded.
+@c(type: "FT_Face", release: "FT_Done_Face", retain: "FT_Reference_Face", as: ["FT_GlyphSlot = self->glyph"])
+class Face
+  // How many faces the font file holds.
+  @c(field: "num_faces")
+  faceCount() -> long
+
+  // Which face of the file this is, from 0; a named instance of a variable font in the upper 16 bits.
+  @c(field: "face_index")
+  index() -> long
+
+  // FreeType's `FT_FACE_FLAG_*` bits for the face, such as `faceFlagScalable`.
+  @c(field: "face_flags")
+  flags() -> long
+
+  // FreeType's `FT_STYLE_FLAG_*` bits for the face in the lower 16, and the number of named instances
+  // of a variable font in the upper.
+  @c(field: "style_flags")
+  styleFlags() -> long
+
+  // How many glyphs the face has.
+  @c(field: "num_glyphs")
+  glyphCount() -> long
+
+  // The family's name, such as `Kaisei Decol`; `None` where the font names none.
+  @c(field: "family_name")
+  familyName() -> Option[string]
+
+  // The style's name, such as `Regular`; `None` where the font names none.
+  @c(field: "style_name")
+  styleName() -> Option[string]
+
+  // How many bitmap sizes the face has built in.
+  @c(field: "num_fixed_sizes")
+  fixedSizeCount() -> int
+
+  // How many character maps the face has.
+  @c(field: "num_charmaps")
+  charmapCount() -> int
+
+  // How many font units make the em square: 1000 or 2048 for most fonts; 0 for a bitmap font.
+  @c(field: "units_per_EM")
+  unitsPerEm() -> int
+
+  // How far the face rises above the baseline, in font units.
+  @c(field: "ascender")
+  ascender() -> int
+
+  // How far the face falls below the baseline, in font units: negative.
+  @c(field: "descender")
+  descender() -> int
+
+  // The distance between two baselines, in font units.
+  @c(field: "height")
+  height() -> int
+
+  // The widest advance of any glyph, in font units.
+  @c(field: "max_advance_width")
+  maxAdvanceWidth() -> int
+
+  // Where an underline sits, in font units: negative, below the baseline.
+  @c(field: "underline_position")
+  underlinePosition() -> int
+
+  // How thick an underline is, in font units.
+  @c(field: "underline_thickness")
+  underlineThickness() -> int
+
+  // The box every glyph fits in, in font units: left, bottom, right and top.
+  @c(field: "bbox.xMin")
+  private bboxXMin() -> long
+  @c(field: "bbox.yMin")
+  private bboxYMin() -> long
+  @c(field: "bbox.xMax")
+  private bboxXMax() -> long
+  @c(field: "bbox.yMax")
+  private bboxYMax() -> long
+
+  boundingBox() -> (long, long, long, long) = (bboxXMin(), bboxYMin(), bboxXMax(), bboxYMax())
+
+  // Whether the face is drawn from outlines, at any size.
+  isScalable() -> bool = (flags() & faceFlagScalable) != 0
+
+  // Whether the face is in an SFNT container: TrueType or OpenType.
+  isSfnt() -> bool = (flags() & faceFlagSfnt) != 0
+
+  // Whether every glyph has one advance.
+  isFixedWidth() -> bool = (flags() & faceFlagFixedWidth) != 0
+
+  // Whether the face has a `kern` table `kerning` reads.
+  hasKerning() -> bool = (flags() & faceFlagKerning) != 0
+
+  // Whether the face is variable: it has axes `mmVar` describes.
+  hasMultipleMasters() -> bool = (flags() & faceFlagMultipleMasters) != 0
+
+  // Whether the face names its glyphs.
+  hasGlyphNames() -> bool = (flags() & faceFlagGlyphNames) != 0
+
+  // Whether the style is italic, and whether it is bold.
+  isItalic() -> bool = (styleFlags() & styleFlagItalic) != 0
+  isBold() -> bool = (styleFlags() & styleFlagBold) != 0
+
+  // How many named instances a variable font has; 0 for a static one.
+  namedInstanceCount() -> int = int(styleFlags() >> 16)
+
+  @c("FT_Error FT_Set_Char_Size(FT_Face self, FT_F26Dot6 width, FT_F26Dot6 height, FT_UInt horizontal, FT_UInt vertical)")
+  private setCharSizeRaw(width: long, height: long, horizontal: int, vertical: int) -> Result[unit, int]
+
+  // Sets the face's size to `width` by `height` points (0 for either is the other) at the resolution
+  // of `horizontalDpi` by `verticalDpi`. `Err` with `invalidPixelSize` for a size a bitmap font does
+  // not have.
+  setCharSize(
+    width: real,
+    height: real,
+    horizontalDpi: int = 72,
+    verticalDpi: int = 72
+  ) -> Result[unit, FreeTypeError] =
+    setCharSizeRaw(fixed26(width), fixed26(height), horizontalDpi, verticalDpi).mapErr(failed("FT_Set_Char_Size"))
+
+  @c("FT_Error FT_Set_Pixel_Sizes(FT_Face self, FT_UInt width, FT_UInt height)")
+  private setPixelSizesRaw(width: int, height: int) -> Result[unit, int]
+
+  // Sets the face's size to `width` by `height` pixels; 0 for either is the other.
+  setPixelSizes(width: int, height: int) -> Result[unit, FreeTypeError] =
+    setPixelSizesRaw(width, height).mapErr(failed("FT_Set_Pixel_Sizes"))
+
+  @c(field: "size->metrics.x_ppem")
+  private xPpem() -> int
+  @c(field: "size->metrics.y_ppem")
+  private yPpem() -> int
+  @c(field: "size->metrics.ascender")
+  private sizeAscender() -> long
+  @c(field: "size->metrics.descender")
+  private sizeDescender() -> long
+  @c(field: "size->metrics.height")
+  private sizeHeight() -> long
+  @c(field: "size->metrics.max_advance")
+  private sizeMaxAdvance() -> long
+
+  // The face's measures at the size it is set to.
+  sizeMetrics() -> SizeMetrics =
+    SizeMetrics(
+      xPpem(),
+      yPpem(),
+      pixels26(sizeAscender()),
+      pixels26(sizeDescender()),
+      pixels26(sizeHeight()),
+      pixels26(sizeMaxAdvance())
+    )
+
+  @c("FT_UInt FT_Get_Char_Index(FT_Face self, FT_ULong code)")
+  private charIndexRaw(code: long) -> int
+
+  // The index of the glyph the face's character map gives `c`; 0, the missing glyph, for a character
+  // it has none for.
+  charIndex(c: char) -> int = charIndexRaw(long(int(c)))
+
+  // The index of the glyph of character code `code` in the selected character map; 0 for none.
+  codeIndex(code: long) -> int = charIndexRaw(code)
+
+  @c("FT_ULong FT_Get_First_Char(FT_Face self, out FT_UInt *index)")
+  private firstCharRaw() -> (long, int)
+
+  @c("FT_ULong FT_Get_Next_Char(FT_Face self, FT_ULong code, out FT_UInt *index)")
+  private nextCharRaw(code: long) -> (long, int)
+
+  // The first character code the selected character map has a glyph for, and the glyph's index;
+  // `None` for an empty map.
+  firstChar() -> Option[(long, int)] = present(firstCharRaw())
+
+  // The next character code after `code` the selected character map has a glyph for, and the glyph's
+  // index; `None` after the last.
+  nextChar(code: long) -> Option[(long, int)] = present(nextCharRaw(code))
+
+  // Every character code of the selected character map with its glyph's index, in increasing order.
+  characters() -> Vector[(long, int)] =
+    val found = Buffer[(long, int)]()
+    var next = firstChar()
+    while next.isDefined()
+      val (code, index) = next.get()
+      found.append((code, index))
+      next = nextChar(code)
+    found.toVector()
+
+  @c("FT_Error FT_Select_Charmap(FT_Face self, FT_Encoding encoding)")
+  private selectCharmapRaw(encoding: Encoding) -> Result[unit, int]
+
+  // Makes the face's character map for `encoding` the one `charIndex` reads. `Err` with
+  // `invalidArgument` where the face has none for it.
+  selectCharmap(encoding: Encoding) -> Result[unit, FreeTypeError] =
+    selectCharmapRaw(encoding).mapErr(failed("FT_Select_Charmap"))
+
+  @c("FT_UInt FT_Get_Name_Index(FT_Face self, const char *name)")
+  private nameIndexRaw(name: string) -> int
+
+  // The index of the glyph the face names `name`, such as `A` or `uni3042`; 0 for no such glyph, and
+  // for a face that names none.
+  nameIndex(name: string) -> int = nameIndexRaw(name)
+
+  @c("const char *FT_Get_Postscript_Name(FT_Face self)")
+  private postscriptNameRaw() -> Option[string]
+
+  // The face's PostScript name, such as `KaiseiDecol-Regular`; `None` where it has none.
+  postscriptName() -> Option[string] = postscriptNameRaw()
+
+  @c("FT_Error FT_Load_Glyph(FT_Face self, FT_UInt index, FT_Int32 flags)")
+  private loadGlyphRaw(index: int, flags: int) -> Result[unit, int]
+
+  // Loads the glyph at `index` into the face's glyph slot. `Err` with `invalidArgument` for an
+  // index past the face's glyphs.
+  loadGlyph(index: int, flags: LoadFlags = LoadFlags.default) -> Result[unit, FreeTypeError] =
+    loadGlyphRaw(index, flags.bits).mapErr(failed("FT_Load_Glyph"))
+
+  @c("FT_Error FT_Load_Char(FT_Face self, FT_ULong code, FT_Int32 flags)")
+  private loadCharRaw(code: long, flags: int) -> Result[unit, int]
+
+  // Loads the glyph the character map gives `c` into the glyph slot: the missing glyph for a character
+  // it has none for.
+  loadChar(c: char, flags: LoadFlags = LoadFlags.default) -> Result[unit, FreeTypeError] =
+    loadCharRaw(long(int(c)), flags.bits).mapErr(failed("FT_Load_Char"))
+
+  @c("FT_Error FT_Render_Glyph(FT_GlyphSlot self, FT_Render_Mode mode)")
+  private renderRaw(mode: RenderMode) -> Result[unit, int]
+
+  // Renders the glyph in the slot to a bitmap in `mode`. `Err` with `cannotRenderGlyph` where FreeType
+  // has no renderer for the glyph or the mode.
+  renderGlyph(mode: RenderMode = Normal) -> Result[unit, FreeTypeError] =
+    renderRaw(mode).mapErr(failed("FT_Render_Glyph"))
+
+  // The index of the glyph in the slot.
+  @c(field: "glyph->glyph_index")
+  glyphIndex() -> int
+
+  @c(field: "glyph->metrics.width")
+  private metricsWidth() -> long
+  @c(field: "glyph->metrics.height")
+  private metricsHeight() -> long
+  @c(field: "glyph->metrics.horiBearingX")
+  private metricsHoriBearingX() -> long
+  @c(field: "glyph->metrics.horiBearingY")
+  private metricsHoriBearingY() -> long
+  @c(field: "glyph->metrics.horiAdvance")
+  private metricsHoriAdvance() -> long
+  @c(field: "glyph->metrics.vertBearingX")
+  private metricsVertBearingX() -> long
+  @c(field: "glyph->metrics.vertBearingY")
+  private metricsVertBearingY() -> long
+  @c(field: "glyph->metrics.vertAdvance")
+  private metricsVertAdvance() -> long
+
+  // The measures of the glyph in the slot.
+  glyphMetrics() -> GlyphMetrics =
+    GlyphMetrics(
+      metricsWidth(),
+      metricsHeight(),
+      metricsHoriBearingX(),
+      metricsHoriBearingY(),
+      metricsHoriAdvance(),
+      metricsVertBearingX(),
+      metricsVertBearingY(),
+      metricsVertAdvance()
+    )
+
+  // How far the glyph in the slot moves the pen, in 26.6 pixels.
+  @c(field: "glyph->advance.x")
+  private advanceX() -> long
+  @c(field: "glyph->advance.y")
+  private advanceY() -> long
+
+  advance() -> Offset = Offset(advanceX(), advanceY())
+
+  // The advance of the glyph in the slot unhinted and unrounded, in 16.16 pixels.
+  @c(field: "glyph->linearHoriAdvance")
+  linearHoriAdvance() -> long
+
+  // The rows and the pixels to a row of the slot's bitmap.
+  @c(field: "glyph->bitmap.rows")
+  bitmapRows() -> int
+  @c(field: "glyph->bitmap.width")
+  bitmapWidth() -> int
+
+  // The bytes from one row of the slot's bitmap to the next: negative for a bitmap stored bottom row
+  // first.
+  @c(field: "glyph->bitmap.pitch")
+  bitmapPitch() -> int
+
+  // How many levels of grey the slot's bitmap has: 256 for `Gray`.
+  @c(field: "glyph->bitmap.num_grays")
+  bitmapGrays() -> int
+
+  // Where the slot's bitmap is placed: pixels right of the pen, and pixels above the baseline of its
+  // top row.
+  @c(field: "glyph->bitmap_left")
+  bitmapLeft() -> int
+  @c(field: "glyph->bitmap_top")
+  bitmapTop() -> int
+
+  @c("FT_Error FT_Get_Kerning(FT_Face self, FT_UInt left, FT_UInt right, FT_Kerning_Mode mode, out FT_Vector *kerning)")
+  private kerningRaw(left: int, right: int, mode: KerningMode) -> Result[Offset, int]
+
+  // How much closer the glyph at `right` sits to the glyph at `left` before it, from the face's `kern`
+  // table: negative `x` to move it left. Zero for a face with no `kern` table, and for a pair it does
+  // not list.
+  kerning(left: int, right: int, mode: KerningMode = Default) -> Result[Offset, FreeTypeError] =
+    kerningRaw(left, right, mode).mapErr(failed("FT_Get_Kerning"))
+
+  @c("FT_Error FT_Load_Sfnt_Table(FT_Face self, FT_ULong tag, FT_Long offset, FT_Byte *buffer, length(buffer) inout FT_ULong *length)")
+  private sfntTableRaw(tag: long, offset: long, buffer: Option[Array[byte]]) -> Result[long, int]
+
+  // The bytes of the SFNT table named by the four characters of `tag`, such as `head` or `OS/2`, as the
+  // font holds them. `Err` with `tableMissing` for a table the face does not have, and with
+  // `invalidArgument` for a tag that is not four ASCII characters or a face that is not SFNT.
+  sfntTable(tag: string) -> Result[Array[byte], FreeTypeError] =
+    val code = tableTag(tag) match
+      Some(code) -> code
+      None -> return Err(Failed("FT_Load_Sfnt_Table", invalidArgument))
+    val size = sfntTableRaw(code, 0, None).mapErr(failed("FT_Load_Sfnt_Table"))?
+    val bytes = Array.fill(int(size), byte(0))
+    sfntTableRaw(code, 0, Some(bytes)).mapErr(failed("FT_Load_Sfnt_Table"))?
+    Ok(bytes)
+
+  @c("FT_Error FT_Get_MM_Var(FT_Face self, out FT_MM_Var **master)", keeps: "self")
+  private mmVarRaw() -> Result[MMVar, int]
+
+  // The face's variation axes and named instances. `Err` with `invalidArgument` for a face that is not
+  // variable.
+  mmVar() -> Result[MMVar, FreeTypeError] = mmVarRaw().mapErr(failed("FT_Get_MM_Var"))
+
+  @c("FT_Error FT_Set_Var_Design_Coordinates(FT_Face self, length(coords) FT_UInt count, FT_Fixed *coords)")
+  private setDesignRaw(coords: Array[long]) -> Result[unit, int]
+
+  @c("FT_Error FT_Get_Var_Design_Coordinates(FT_Face self, length(coords) FT_UInt count, FT_Fixed *coords)")
+  private getDesignRaw(coords: Array[long]) -> Result[unit, int]
+
+  // Sets the face's design coordinates, one for each axis in order, in the axes' own units (such as a
+  // weight of 300 to 700); axes left out take their defaults. `Err` with `invalidArgument` for a face
+  // that is not variable.
+  setDesignCoordinates(coords: Array[real]) -> Result[unit, FreeTypeError] =
+    setDesignRaw(coords.map(fixed16)).mapErr(failed("FT_Set_Var_Design_Coordinates"))
+
+  // The face's design coordinates, the first `count` axes'. `Err` with `invalidArgument` for a face
+  // that is not variable.
+  designCoordinates(count: int) -> Result[Array[real], FreeTypeError] =
+    val coords = Array.fill(count, long(0))
+    getDesignRaw(coords).mapErr(failed("FT_Get_Var_Design_Coordinates"))?
+    Ok(coords.map(real16))
+
+  @c("FT_Error FT_Set_Named_Instance(FT_Face self, FT_UInt index)")
+  private setNamedInstanceRaw(index: int) -> Result[unit, int]
+
+  // Sets a variable face to its named instance `index`, counted from 1; 0 is the default coordinates.
+  // `Err` with `invalidArgument` for an index past the named instances.
+  setNamedInstance(index: int) -> Result[unit, FreeTypeError] =
+    setNamedInstanceRaw(index).mapErr(failed("FT_Set_Named_Instance"))
+
+  @c("FT_Error FT_Get_Default_Named_Instance(FT_Face self, out FT_UInt *index)")
+  private defaultNamedInstanceRaw() -> Result[int, int]
+
+  // The named instance, counted from 1, whose coordinates are the axes' defaults; 0 where there is none.
+  // `Err` with `invalidArgument` for a face that is not variable.
+  defaultNamedInstance() -> Result[int, FreeTypeError] =
+    defaultNamedInstanceRaw().mapErr(failed("FT_Get_Default_Named_Instance"))
+
+// The four characters of a table's tag packed as FreeType's `FT_MAKE_TAG` packs them; `None` for a
+// tag that is not four ASCII characters.
+private tableTag(tag: string) -> Option[long] =
+  if tag.byteLength() != 4 || (0 ..< 4).exists(i -> int(tag.byteAt(i)) > 127) then None
+  else Some((0 ..< 4).foldLeft(long(0), (code: long, i: int) -> code * 256 + long(int(tag.byteAt(i)))))
+
+// What `FT_Get_First_Char` and `FT_Get_Next_Char` answer, with a glyph index of 0 as the end.
+private present(found: (long, int)) -> Option[(long, int)] = found match
+  (_, 0) -> None
+  _ -> Some(found)
+
+// `x` in 26.6 fixed point, rounded to the nearest.
+private fixed26(x: real) -> long = long(math.floor(x * 64.0 + 0.5))
+
+// A 26.6 fixed-point value as a real.
+private pixels26(x: long) -> real = real(x) / 64.0
+
+// `x` in 16.16 fixed point, rounded to the nearest.
+private fixed16(x: real) -> long = long(math.floor(x * 65536.0 + 0.5))
+
+// A 16.16 fixed-point value as a real.
+private real16(x: long) -> real = real(x) / 65536.0

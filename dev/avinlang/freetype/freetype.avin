@@ -1,0 +1,69 @@
+module dev.avinlang.freetype
+
+// FreeType's libraries and its errors. A library is FreeType's own state: every face is opened through
+// one, belongs to it, and keeps it alive.
+import avin.c.ByteBlock
+
+// A failure FreeType reported: the call that failed and FreeType's error code, one of the `FT_Err_*`
+// values such as `cannotOpenResource`.
+data FreeTypeError
+  Failed(call: string, code: int)
+
+@c("const char *FT_Error_String(FT_Error error_code)")
+private errorStringRaw(code: int) -> Option[string]
+
+// FreeType's own description of an error code; `None` where FreeType was built without its error
+// strings, as many distributions build it, and for a code it does not know.
+errorString(code: int) -> Option[string] = errorStringRaw(code)
+
+// What went wrong, as one line: the call, FreeType's description where it has one, and the code.
+describe(e: FreeTypeError) -> string = e match
+  Failed(call, code) -> errorString(code) match
+    Some(text) -> s"$call failed: $text (error $code)"
+    None -> s"$call failed: error $code"
+
+private failed(call: string) -> (int) -> FreeTypeError = code -> Failed(call, code)
+
+// FreeType's state: its modules, its memory and the faces opened through it. FreeType counts its
+// references; the handle holds one and every face opened through it holds another, so the library is
+// given back only once neither the handle nor any face needs it, whatever order they go in.
+//
+// Each reference is given back with `FT_Done_Library`, which drops the count and frees the library
+// with its last. `FT_Done_FreeType`, its pair for `FT_Init_FreeType`, cannot be used: after dropping
+// the count it frees the library's memory manager whatever the count is, so a face still holding the
+// library allocates through freed memory at its next load. The manager's own record, a few bytes
+// FreeType allocates for each library, is therefore not given back.
+@c(type: "FT_Library", release: "FT_Done_Library", retain: "FT_Reference_Library")
+class Library
+  @c("void FT_Library_Version(FT_Library self, out FT_Int *major, out FT_Int *minor, out FT_Int *patch)")
+  private versionRaw() -> (int, int, int)
+
+  // The version of FreeType the library is, as its major, minor and patch numbers.
+  version() -> (int, int, int) = versionRaw()
+
+  @c("FT_Error FT_New_Face(FT_Library self, const char *path, FT_Long index, out FT_Face *face)", keeps: "self")
+  private newFaceRaw(path: string, index: long) -> Result[Face, int]
+
+  @c(
+    "FT_Error FT_New_Memory_Face(FT_Library self, const FT_Byte *base, length(base) FT_Long size, FT_Long index, out FT_Face *face)",
+    keeps: ["self", "base"]
+  )
+  private memoryFaceRaw(base: ByteBlock, index: long) -> Result[Face, int]
+
+  // The face at `index` of the font file at `path`: 0 for the first, and the only one of most files.
+  // `Err` with `cannotOpenResource` for a file that cannot be read, `unknownFileFormat` for one that is
+  // not a font, and `invalidArgument` for an index the file has no face at.
+  openFace(path: string, index: long = 0) -> Result[Face, FreeTypeError] =
+    newFaceRaw(path, index).mapErr(failed("FT_New_Face"))
+
+  // The face at `index` of the font held in `bytes`. FreeType reads the bytes as it needs them for
+  // as long as the face lives, so the face keeps the block. `Err` as `openFace` answers, with
+  // `unknownFileFormat` for bytes that are not a font.
+  openMemoryFace(bytes: ByteBlock, index: long = 0) -> Result[Face, FreeTypeError] =
+    memoryFaceRaw(bytes, index).mapErr(failed("FT_New_Memory_Face"))
+
+@c("FT_Error FT_Init_FreeType(out FT_Library *library)")
+private initRaw() -> Result[Library, int]
+
+// A new library with FreeType's default modules: every font format it was built with.
+library() -> Result[Library, FreeTypeError] = initRaw().mapErr(failed("FT_Init_FreeType"))

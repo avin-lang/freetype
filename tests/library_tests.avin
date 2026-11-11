@@ -1,0 +1,70 @@
+module tests
+
+// Libraries: made, versioned, closed; FreeType's error codes and their descriptions.
+import dev.avinlang.freetype.{
+  Failed,
+  cannotOpenResource,
+  describe,
+  errorString,
+  invalidArgument,
+  library,
+  ok,
+  tableMissing,
+  unknownFileFormat
+}
+
+@test("a library is made, and reports FreeType 2")
+libraryVersion()
+  val (major, minor, patch) = lib().version()
+  assertEq(major, 2)
+  assert(minor >= 10)
+  assert(patch >= 0)
+
+@test("two libraries are independent, and report one version")
+twoLibraries()
+  val a = lib()
+  val b = lib()
+  assert(a !== b)
+  assertEq(a.version(), b.version())
+
+@test(should_trap: "`Library` is closed")
+libraryUsedAfterClose()
+  val l = lib()
+  l.close()
+  l.version()
+
+@test("FreeType's error codes are its own numbers")
+errorCodes()
+  assertEq(ok, 0)
+  assertEq(cannotOpenResource, 1)
+  assertEq(unknownFileFormat, 2)
+  assertEq(invalidArgument, 6)
+  assertEq(tableMissing, 142)
+
+@test("an error is described with its call and its code, and FreeType's words where it has them")
+describeErrors()
+  val text = describe(Failed("FT_New_Face", cannotOpenResource))
+  assert(text.startsWith("FT_New_Face failed: "))
+  assert(text.contains("1"))
+  errorString(cannotOpenResource) match
+    Some(words) -> assert(text.contains(words))
+    None -> assertEq(text, "FT_New_Face failed: error 1")
+
+@test("an error string is `None` or text, and success's is never an error's")
+errorStrings()
+  errorString(ok) match
+    Some(words) -> assert(words.byteLength() > 0)
+    None -> ()
+  errorString(-1) match
+    Some(words) -> assert(words.byteLength() >= 0)
+    None -> ()
+  errorString(unknownFileFormat) match
+    Some(words) -> assert(words != errorString(cannotOpenResource).getOrElse(""))
+    None -> assertEq(errorString(cannotOpenResource), None)
+
+@test("a thousand libraries made and dropped are given back by the collector")
+manyLibraries()
+  for i in 0 ..< 1000
+    val (major, _, _) = made(library()).version()
+    assertEq(major, 2)
+  assertEq(churn(), 6000)

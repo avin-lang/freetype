@@ -1,0 +1,122 @@
+module tests
+
+// Who outlives whom: a face outliving its library's handle, closed or collected; a variation
+// descriptor outliving its face's handle; and a thousand faces made and dropped, from files and from
+// memory, given back by the collector in whatever order it finds them.
+import dev.avinlang.freetype.{Face, Library, MMVar, library}
+
+@test("a face outlives its library's handle, closed: FT_Done_FreeType only drops a count")
+faceOutlivesClosedLibrary()
+  val l = lib()
+  val face = made(l.openFace(kaiseiPath))
+  l.close()
+  assertEq(face.familyName(), Some("Kaisei Decol"))
+  made(face.setPixelSizes(0, 64))
+  made(face.loadChar('あ'))
+  made(face.renderGlyph())
+  assert(face.bitmapRows() > 0)
+  assertEq(made(face.sfntTable("head")).length(), 54)
+
+// A face whose library's handle is unreachable once this returns.
+private orphan(path: string) -> Face = made(made(library()).openFace(path))
+
+@test("a face outlives its library's handle, collected")
+faceOutlivesCollectedLibrary()
+  val face = orphan(ptSansPath)
+  assertEq(churn(), 6000)
+  made(face.setPixelSizes(0, 30))
+  made(face.loadChar('A'))
+  made(face.renderGlyph())
+  assert(face.bitmapRows() > 0)
+
+@test("a face from memory outlives its library's handle and the block's last other reference")
+memoryFaceOutlivesLibrary()
+  val l = lib()
+  val face = made(l.openMemoryFace(blockOf(ptSansPath)))
+  l.close()
+  assertEq(churn(), 6000)
+  made(face.setPixelSizes(0, 30))
+  made(face.loadChar('A'))
+  assert(face.glyphMetrics().width > 0)
+
+@test("faces from one library, closed in either order with the library's handle between")
+facesClosedAroundLibrary()
+  val l = lib()
+  val a = made(l.openFace(kaiseiPath))
+  val b = made(l.openFace(ptSansPath))
+  a.close()
+  l.close()
+  assertEq(b.familyName(), Some("PT Sans"))
+  b.close()
+
+@test("a variation descriptor outlives its face's handle and its library's")
+mmVarOutlivesFace()
+  val l = lib()
+  val face = made(l.openFace(quicksandPath))
+  val mm = made(face.mmVar())
+  face.close()
+  l.close()
+  assertEq(churn(), 6000)
+  assertEq(mm.axis(0).tag, "wght")
+  assertEq(mm.namedStyleCount(), 5)
+
+// A descriptor whose face and library handles are unreachable once this returns.
+private orphanMmVar() -> MMVar = orphan(quicksandPath).mmVar() match
+  Ok(mm) -> mm
+  Err(e) -> fail(s"FreeType failed: $e")
+
+@test("a variation descriptor outlives its face and library, collected")
+mmVarOutlivesCollectedFace()
+  val mm = orphanMmVar()
+  assertEq(churn(), 6000)
+  assertEq(mm.axes().length(), 1)
+  mm.close()
+
+@test(should_trap: "`MMVar` is closed")
+mmVarUsedAfterClose()
+  val mm = orphanMmVar()
+  mm.close()
+  mm.axisCount()
+
+@test("a thousand faces made from a file and dropped are given back by the collector")
+thousandFaces()
+  val l = lib()
+  for i in 0 ..< 1000
+    val face = made(l.openFace(ptSansPath))
+    assertEq(face.glyphCount(), 720)
+  assertEq(churn(), 6000)
+  assertEq(made(l.openFace(ptSansPath)).glyphCount(), 720)
+
+@test("a thousand faces, each with a library of its own, dropped together")
+thousandFacesAndLibraries()
+  for i in 0 ..< 1000
+    assertEq(orphan(ptSansPath).unitsPerEm(), 1000)
+  assertEq(churn(), 6000)
+
+@test("a thousand faces from memory over one block, dropped, and the block still read")
+thousandMemoryFaces()
+  val block = blockOf(ptSansPath)
+  val l = lib()
+  for i in 0 ..< 1000
+    val face = made(l.openMemoryFace(block))
+    assertEq(face.charIndex('A'), face.nameIndex("A"))
+  assertEq(churn(), 6000)
+  assertEq(made(l.openMemoryFace(block)).familyName(), Some("PT Sans"))
+
+@test("a thousand variation descriptors made and dropped")
+thousandMmVars()
+  val face = quicksand()
+  for i in 0 ..< 1000
+    assertEq(made(face.mmVar()).axisCount(), 1)
+  assertEq(churn(), 6000)
+
+@test("faces kept in a vector and closed one by one, the rest still usable")
+facesInVector()
+  val l: Library = lib()
+  val faces = (0 ..< 20).map(i -> made(l.openFace(if i % 2 == 0 then kaiseiPath else ptSansPath))).toVector()
+  l.close()
+  for i in 0 ..< 20
+    if i % 3 == 0 then faces(i).close()
+  assertEq(churn(), 6000)
+  for i in 0 ..< 20
+    if i % 3 != 0 then assert(faces(i).glyphCount() > 0)
