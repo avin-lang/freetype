@@ -45,8 +45,8 @@ class Library
   private newFaceRaw(path: string, index: long) -> Result[Face, int]
 
   @c(
-    "FT_Error FT_New_Memory_Face(FT_Library self, const FT_Byte *base, length(base) FT_Long size, FT_Long index, out FT_Face *face)",
-    keeps: ["self", "base"]
+      "FT_Error FT_New_Memory_Face(FT_Library self, const FT_Byte *base, length(base) FT_Long size, FT_Long index, out FT_Face *face)",
+      keeps: ["self", "base"]
   )
   private memoryFaceRaw(base: ByteBlock, index: long) -> Result[Face, int]
 

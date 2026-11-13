@@ -81,111 +81,159 @@ data Encoding
 // FreeType's error codes: what a `Failed` holds.
 @c(const: "FT_Err_Ok")
 val ok: int
+
 @c(const: "FT_Err_Cannot_Open_Resource")
 val cannotOpenResource: int
+
 @c(const: "FT_Err_Unknown_File_Format")
 val unknownFileFormat: int
+
 @c(const: "FT_Err_Invalid_File_Format")
 val invalidFileFormat: int
+
 @c(const: "FT_Err_Invalid_Version")
 val invalidVersion: int
+
 @c(const: "FT_Err_Invalid_Argument")
 val invalidArgument: int
+
 @c(const: "FT_Err_Unimplemented_Feature")
 val unimplementedFeature: int
+
 @c(const: "FT_Err_Invalid_Table")
 val invalidTable: int
+
 @c(const: "FT_Err_Invalid_Glyph_Index")
 val invalidGlyphIndex: int
+
 @c(const: "FT_Err_Invalid_Character_Code")
 val invalidCharacterCode: int
+
 @c(const: "FT_Err_Invalid_Glyph_Format")
 val invalidGlyphFormat: int
+
 @c(const: "FT_Err_Cannot_Render_Glyph")
 val cannotRenderGlyph: int
+
 @c(const: "FT_Err_Invalid_Pixel_Size")
 val invalidPixelSize: int
+
 @c(const: "FT_Err_Invalid_Handle")
 val invalidHandle: int
+
 @c(const: "FT_Err_Invalid_Face_Handle")
 val invalidFaceHandle: int
+
 @c(const: "FT_Err_Out_Of_Memory")
 val outOfMemory: int
+
 @c(const: "FT_Err_Table_Missing")
 val tableMissing: int
 
 // What a face is and has, as `Face.flags()` answers them.
 @c(const: "FT_FACE_FLAG_SCALABLE")
 val faceFlagScalable: long
+
 @c(const: "FT_FACE_FLAG_FIXED_SIZES")
 val faceFlagFixedSizes: long
+
 @c(const: "FT_FACE_FLAG_FIXED_WIDTH")
 val faceFlagFixedWidth: long
+
 @c(const: "FT_FACE_FLAG_SFNT")
 val faceFlagSfnt: long
+
 @c(const: "FT_FACE_FLAG_HORIZONTAL")
 val faceFlagHorizontal: long
+
 @c(const: "FT_FACE_FLAG_VERTICAL")
 val faceFlagVertical: long
+
 @c(const: "FT_FACE_FLAG_KERNING")
 val faceFlagKerning: long
+
 @c(const: "FT_FACE_FLAG_MULTIPLE_MASTERS")
 val faceFlagMultipleMasters: long
+
 @c(const: "FT_FACE_FLAG_GLYPH_NAMES")
 val faceFlagGlyphNames: long
+
 @c(const: "FT_FACE_FLAG_HINTER")
 val faceFlagHinter: long
+
 @c(const: "FT_FACE_FLAG_COLOR")
 val faceFlagColor: long
+
 @c(const: "FT_FACE_FLAG_VARIATION")
 val faceFlagVariation: long
 
 // A face's style, as `Face.styleFlags()` answers it.
 @c(const: "FT_STYLE_FLAG_ITALIC")
 val styleFlagItalic: long
+
 @c(const: "FT_STYLE_FLAG_BOLD")
 val styleFlagBold: long
 
 @c(const: "FT_LOAD_DEFAULT")
 private val ftLoadDefault: int
+
 @c(const: "FT_LOAD_NO_SCALE")
 private val ftLoadNoScale: int
+
 @c(const: "FT_LOAD_NO_HINTING")
 private val ftLoadNoHinting: int
+
 @c(const: "FT_LOAD_RENDER")
 private val ftLoadRender: int
+
 @c(const: "FT_LOAD_NO_BITMAP")
 private val ftLoadNoBitmap: int
+
 @c(const: "FT_LOAD_VERTICAL_LAYOUT")
 private val ftLoadVerticalLayout: int
+
 @c(const: "FT_LOAD_FORCE_AUTOHINT")
 private val ftLoadForceAutohint: int
+
 @c(const: "FT_LOAD_PEDANTIC")
 private val ftLoadPedantic: int
+
 @c(const: "FT_LOAD_NO_RECURSE")
 private val ftLoadNoRecurse: int
+
 @c(const: "FT_LOAD_IGNORE_TRANSFORM")
 private val ftLoadIgnoreTransform: int
+
 @c(const: "FT_LOAD_MONOCHROME")
 private val ftLoadMonochrome: int
+
 @c(const: "FT_LOAD_LINEAR_DESIGN")
 private val ftLoadLinearDesign: int
+
 @c(const: "FT_LOAD_NO_AUTOHINT")
 private val ftLoadNoAutohint: int
+
 @c(const: "FT_LOAD_COLOR")
 private val ftLoadColor: int
+
 @c(const: "FT_LOAD_COMPUTE_METRICS")
 private val ftLoadComputeMetrics: int
+
 @c(const: "FT_LOAD_BITMAP_METRICS_ONLY")
 private val ftLoadBitmapMetricsOnly: int
+
 @c(const: "FT_LOAD_TARGET_NORMAL")
 private val ftLoadTargetNormal: int
+
 @c(const: "FT_LOAD_TARGET_LIGHT")
 private val ftLoadTargetLight: int
+
 @c(const: "FT_LOAD_TARGET_MONO")
 private val ftLoadTargetMono: int
+
 @c(const: "FT_LOAD_TARGET_LCD")
 private val ftLoadTargetLcd: int
+
 @c(const: "FT_LOAD_TARGET_LCD_V")
 private val ftLoadTargetLcdV: int
 

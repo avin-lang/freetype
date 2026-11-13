@@ -109,7 +109,7 @@ viewFollowsTheSlot()
   made(face.loadChar('.', unhinted))
   made(face.renderGlyph())
   val secondRows = face.bitmapRows()
-  assertEq(face.bitmap().get.length,face.bitmapPitch() * secondRows)
+  assertEq(face.bitmap().get.length, face.bitmapPitch() * secondRows)
   assert(secondRows < firstRows)
   assert(firstLength > 0)
 
@@ -210,7 +210,7 @@ charmapEncodings()
   for path in [kaiseiPath, ptSansPath, quicksandPath]
     val face = open(path)
     val encodings = face.charmapEncodings()
-    assertEq(encodings.length,face.charmapCount())
+    assertEq(encodings.length, face.charmapCount())
     assert(encodings.contains(Unicode))
     assertEq(face.charmapEncoding(0), encodings(0))
 

@@ -34,19 +34,19 @@ The measures of a glyph at 48 pixels:
 import dev.avinlang.freetype.{FreeTypeError, describe, library}
 
 measure(path: string, c: char) -> Result[unit, FreeTypeError] =
-    val lib = library()?
-    val face = lib.openFace(path)?
-    face.setPixelSizes(0, 48)?
-    face.loadChar(c)?
-    face.renderGlyph()?
-    println(s"${face.familyName().getOrElse("?")}: ${face.bitmapWidth()} x ${face.bitmapRows()} pixels")
-    println(s"advance ${face.advance().x / 64} pixels, top ${face.bitmapTop()} above the baseline")
-    Ok(())
+  val lib = library()?
+  val face = lib.openFace(path)?
+  face.setPixelSizes(0, 48)?
+  face.loadChar(c)?
+  face.renderGlyph()?
+  println(s"${face.familyName().getOrElse("?")}: ${face.bitmapWidth()} x ${face.bitmapRows()} pixels")
+  println(s"advance ${face.advance().x / 64} pixels, top ${face.bitmapTop()} above the baseline")
+  Ok(())
 
 main(args: Vector[string])
-    measure(args(0), 'あ') match
-        Ok(_) -> ()
-        Err(e) -> println(describe(e))
+  measure(args(0), 'あ') match
+    Ok(_) -> ()
+    Err(e) -> println(describe(e))
 ```
 
 ## What is bound

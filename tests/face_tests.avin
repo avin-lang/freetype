@@ -3,6 +3,7 @@ module tests
 // Faces opened from files: what FreeType reads of each bundled font, compared with the numbers its
 // tables hold, and the files that are not fonts.
 import avin.fs
+
 import dev.avinlang.freetype.{
   BBox,
   cannotOpenResource,
