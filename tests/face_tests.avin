@@ -128,7 +128,7 @@ unicodePath()
 
 @test(should_trap: "holds a NUL")
 pathWithNul()
-  lib().openFace("tests/fonts\u{0}/x.ttf")
+  val _ = lib().openFace("tests/fonts\u{0}/x.ttf") // the call traps before it answers
 
 @test(should_trap: "`Face` is closed")
 faceUsedAfterClose()
