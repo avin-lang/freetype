@@ -15,7 +15,7 @@ faceOutlivesClosedLibrary()
   made(face.loadChar('あ'))
   made(face.renderGlyph())
   assert(face.bitmapRows() > 0)
-  assertEq(made(face.sfntTable("head")).length(), 54)
+  assertEq(made(face.sfntTable("head")).length, 54)
 
 // A face whose library's handle is unreachable once this returns.
 private orphan(path: string) -> Face = made(made(library()).openFace(path))
@@ -69,7 +69,7 @@ private orphanMmVar() -> MMVar = orphan(quicksandPath).mmVar() match
 mmVarOutlivesCollectedFace()
   val mm = orphanMmVar()
   assertEq(churn(), 6000)
-  assertEq(mm.axes().length(), 1)
+  assertEq(mm.axes().length, 1)
   mm.close()
 
 @test(should_trap: "`MMVar` is closed")
@@ -113,7 +113,7 @@ thousandMmVars()
 @test("faces kept in a vector and closed one by one, the rest still usable")
 facesInVector()
   val l: Library = lib()
-  val faces = (0 ..< 20).map(i -> made(l.openFace(if i % 2 == 0 then kaiseiPath else ptSansPath))).toVector()
+  val faces = (0 ..< 20).map(i -> made(l.openFace(if i % 2 == 0 then kaiseiPath else ptSansPath))).toVector
   l.close()
   for i in 0 ..< 20
     if i % 3 == 0 then faces(i).close()

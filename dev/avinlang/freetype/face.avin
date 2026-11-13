@@ -148,7 +148,7 @@ class Face
   charmapEncoding(i: int) -> Encoding
 
   // The encodings of every character map the face has, in the face's order.
-  charmapEncodings() -> Vector[Encoding] = (0 ..< charmapCount()).map(i -> charmapEncoding(i)).toVector()
+  charmapEncodings() -> Vector[Encoding] = (0 ..< charmapCount()).map(i -> charmapEncoding(i)).toVector
 
   // Whether the face is drawn from outlines, at any size.
   isScalable() -> bool = (flags() & faceFlagScalable) != 0
@@ -228,11 +228,11 @@ class Face
   characters() -> Vector[(long, int)] =
     val found = Buffer[(long, int)]()
     var next = firstChar()
-    while next.isDefined()
-      val (code, index) = next.get()
+    while next.isDefined
+      val (code, index) = next.get
       found.append((code, index))
       next = nextChar(code)
-    found.toVector()
+    found.toVector
 
   @c("FT_Error FT_Select_Charmap(FT_Face self, FT_Encoding encoding)")
   private selectCharmapRaw(encoding: Encoding) -> Result[unit, int]
@@ -436,7 +436,7 @@ class Face
 // The four characters of a table's tag packed as FreeType's `FT_MAKE_TAG` packs them; `None` for a
 // tag that is not four ASCII characters.
 private tableTag(tag: string) -> Option[long] =
-  if tag.byteLength() != 4 || (0 ..< 4).exists(i -> int(tag.byteAt(i)) > 127) then None
+  if tag.byteLength != 4 || (0 ..< 4).exists(i -> int(tag.byteAt(i)) > 127) then None
   else Some((0 ..< 4).foldLeft(long(0), (code: long, i: int) -> code * 256 + long(int(tag.byteAt(i)))))
 
 // What `FT_Get_First_Char` and `FT_Get_Next_Char` answer, with a glyph index of 0 as the end.

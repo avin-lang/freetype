@@ -53,10 +53,10 @@ describeErrors()
 @test("an error string is `None` or text, and success's is never an error's")
 errorStrings()
   errorString(ok) match
-    Some(words) -> assert(words.byteLength() > 0)
+    Some(words) -> assert(words.byteLength > 0)
     None -> ()
   errorString(-1) match
-    Some(words) -> assert(words.byteLength() >= 0)
+    Some(words) -> assert(words.byteLength >= 0)
     None -> ()
   errorString(unknownFileFormat) match
     Some(words) -> assert(words != errorString(cannotOpenResource).getOrElse(""))

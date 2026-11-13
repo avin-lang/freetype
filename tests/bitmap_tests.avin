@@ -33,9 +33,9 @@ private knownA() -> Vector[Vector[int]] =
 // The same glyph rendered to one bit to a pixel, a byte to a row, the leftmost pixel the high bit.
 private knownAMono() -> Vector[int] = [16, 16, 48, 40, 40, 68, 124, 68, 130]
 
-private rowOf(g: Glyph, r: int) -> Vector[int] = (0 ..< g.rowBytes).map(c -> int(g.at(r, c))).toVector()
+private rowOf(g: Glyph, r: int) -> Vector[int] = (0 ..< g.rowBytes).map(c -> int(g.at(r, c))).toVector
 
-private pixelsOf(g: Glyph) -> Vector[Vector[int]] = (0 ..< g.rows).map(r -> rowOf(g, r)).toVector()
+private pixelsOf(g: Glyph) -> Vector[Vector[int]] = (0 ..< g.rows).map(r -> rowOf(g, r)).toVector
 
 private val unhinted: LoadFlags = LoadFlags.noHinting
 
@@ -47,7 +47,7 @@ knownRendering()
   assertEq(g.pixelMode, Gray)
   assertEq(g.index, face.charIndex('A'))
   assertEq(pixelsOf(g), knownA())
-  assertEq(g.pixels.length(), 63)
+  assertEq(g.pixels.length, 63)
 
 @test("a glyph rendered to one bit a pixel is the known rendering, a byte to a row")
 knownMonoRendering()
@@ -72,8 +72,8 @@ bitmapView()
   made(face.loadChar('A', unhinted))
   made(face.renderGlyph())
   val (pitch, rows, width) = (face.bitmapPitch(), face.bitmapRows(), face.bitmapWidth())
-  val view = face.bitmap().get()
-  assertEq(view.length(), pitch * rows)
+  val view = face.bitmap().get
+  assertEq(view.length, pitch * rows)
   assert(pitch >= width)
   val known = knownA()
   for r in 0 ..< rows
@@ -85,19 +85,19 @@ spaceHasNoView()
   val face = sized(ptSansPath, 12)
   made(face.loadChar(' '))
   made(face.renderGlyph())
-  assertEq(face.bitmap().isDefined(), false)
+  assertEq(face.bitmap().isDefined, false)
   assertEq(face.bitmapRows(), 0)
   val g = made(face.renderChar(' '))
-  assertEq((g.width, g.rows, g.pixels.length()), (0, 0, 0))
+  assertEq((g.width, g.rows, g.pixels.length), (0, 0, 0))
   assert(g.advance > 0.0)
 
 @test("a glyph loaded and not rendered has no bitmap view; rendering gives it one")
 noViewBeforeRender()
   val face = sized(ptSansPath, 12)
   made(face.loadChar('A'))
-  assertEq(face.bitmap().isDefined(), false)
+  assertEq(face.bitmap().isDefined, false)
   made(face.renderGlyph())
-  assert(face.bitmap().isDefined())
+  assert(face.bitmap().isDefined)
 
 @test("the view's bytes are replaced when another glyph is rendered")
 viewFollowsTheSlot()
@@ -105,11 +105,11 @@ viewFollowsTheSlot()
   made(face.loadChar('A', unhinted))
   made(face.renderGlyph())
   val firstRows = face.bitmapRows()
-  val firstLength = face.bitmap().get().length()
+  val firstLength = face.bitmap().get.length
   made(face.loadChar('.', unhinted))
   made(face.renderGlyph())
   val secondRows = face.bitmapRows()
-  assertEq(face.bitmap().get().length(), face.bitmapPitch() * secondRows)
+  assertEq(face.bitmap().get.length,face.bitmapPitch() * secondRows)
   assert(secondRows < firstRows)
   assert(firstLength > 0)
 
@@ -118,10 +118,10 @@ viewClosedWhenTheFaceIsUsed()
   val face = sized(ptSansPath, 12)
   made(face.loadChar('A', unhinted))
   made(face.renderGlyph())
-  val view = face.bitmap().get()
-  assert(view.length() > 0)
+  val view = face.bitmap().get
+  assert(view.length > 0)
   face.bitmapRows()
-  view.length()
+  view.length
 
 @test("the glyph format is an outline once loaded and a bitmap once rendered")
 glyphFormats()
@@ -152,7 +152,7 @@ pixelModes()
   for (mode, flags, expected) in modes
     val g = made(face.renderChar('g', mode, flags))
     assertEq(g.pixelMode, expected)
-    assertEq(g.pixels.length(), g.rows * g.rowBytes)
+    assertEq(g.pixels.length, g.rows * g.rowBytes)
     assert(g.rows > 0)
     assert(g.width > 0)
     assert(g.pixels.exists(b -> b != byte(0)))
@@ -200,9 +200,9 @@ glyphCopyUnderChurn()
   val face = sized(ptSansPath, 12)
   made(face.loadChar('A', unhinted))
   made(face.renderGlyph())
-  val view = face.bitmap().get()
+  val view = face.bitmap().get
   assertEq(churn(), 6000)
-  assertEq(view.length(), 9 * face.bitmapPitch())
+  assertEq(view.length, 9 * face.bitmapPitch())
   assertEq(pixelsOf(made(face.renderChar('A', RenderMode.Normal, unhinted))), knownA())
 
 @test("a face's character maps each have an encoding, and every bundled face has a Unicode one")
@@ -210,7 +210,7 @@ charmapEncodings()
   for path in [kaiseiPath, ptSansPath, quicksandPath]
     val face = open(path)
     val encodings = face.charmapEncodings()
-    assertEq(encodings.length(), face.charmapCount())
+    assertEq(encodings.length,face.charmapCount())
     assert(encodings.contains(Unicode))
     assertEq(face.charmapEncoding(0), encodings(0))
 

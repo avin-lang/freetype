@@ -43,7 +43,7 @@ class MMVar
     Axis(axisName(i), tagText(axisTag(i)), real16(axisMinimum(i)), real16(axisDefault(i)), real16(axisMaximum(i)))
 
   // Every axis, in the face's order.
-  axes() -> Vector[Axis] = (0 ..< axisCount()).map(axis).toVector()
+  axes() -> Vector[Axis] = (0 ..< axisCount()).map(axis).toVector
 
   @c(field: "namedstyle[i].coords[j]", bound: ["self->num_namedstyles", "self->num_axis"])
   private styleCoordinate(i: int, j: int) -> long
@@ -55,11 +55,11 @@ class MMVar
   // The named instance at `i`, from 0; it is instance `i + 1` to `Face.setNamedInstance`. Traps
   // outside `0 ..< namedStyleCount()`.
   namedStyle(i: int) -> NamedStyle =
-    val coords = (0 ..< axisCount()).map(j -> real16(styleCoordinate(i, j))).toVector()
+    val coords = (0 ..< axisCount()).map(j -> real16(styleCoordinate(i, j))).toVector
     NamedStyle(coords, styleNameId(i), stylePostscriptId(i))
 
   // Every named instance, in the face's order.
-  namedStyles() -> Vector[NamedStyle] = (0 ..< namedStyleCount()).map(namedStyle).toVector()
+  namedStyles() -> Vector[NamedStyle] = (0 ..< namedStyleCount()).map(namedStyle).toVector
 
 // The four characters of a tag `FT_MAKE_TAG` packed.
 private tagText(tag: long) -> string =

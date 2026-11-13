@@ -38,10 +38,10 @@ sameGlyphFromMemory()
 @test("the head table read from memory is the file's")
 tablesFromMemory()
   val face = made(lib().openMemoryFace(blockOf(kaiseiPath)))
-  assertEq(made(face.sfntTable("head")).toVector(), made(kaisei().sfntTable("head")).toVector())
+  assertEq(made(face.sfntTable("head")).toVector, made(kaisei().sfntTable("head")).toVector)
 
 // The bytes of `text` in a block.
-private blockOfText(text: string) -> ByteBlock = blockOfBytes(Array.tabulate(text.byteLength(), i -> text.byteAt(i)))
+private blockOfText(text: string) -> ByteBlock = blockOfBytes(Array.tabulate(text.byteLength, i -> text.byteAt(i)))
 
 // A face over a block of its own, with no other reference to the block left.
 private memoryFace(path: string) -> Face = made(lib().openMemoryFace(blockOf(path)))
@@ -62,7 +62,7 @@ blockSharedWithFace()
   val block = blockOf(ptSansPath)
   val face = made(lib().openMemoryFace(block))
   assertEq(face.familyName(), Some("PT Sans"))
-  assertEq(block.length(), bytesOf(ptSansPath).length())
+  assertEq(block.length, bytesOf(ptSansPath).length)
 
 @test("bytes that are not a font are Err, invalid-file-format, from FT_New_Memory_Face")
 notAFontInMemory()

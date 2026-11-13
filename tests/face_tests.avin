@@ -99,19 +99,19 @@ directoryIsNoFont()
 @test("a file of text is Err, FreeType's unknown-file-format")
 textFile()
   val path = s"${scratch()}/not-a-font.ttf"
-  assert(fs.writeText(path, "This is not a font, though its name says it is.\n").isOk())
+  assert(fs.writeText(path, "This is not a font, though its name says it is.\n").isOk)
   assertEq(code(lib().openFace(path)), unknownFileFormat)
 
 @test("an empty file is Err, FreeType's unknown-file-format")
 emptyFile()
   val path = s"${scratch()}/empty.ttf"
-  assert(fs.writeText(path, "").isOk())
+  assert(fs.writeText(path, "").isOk)
   assertEq(code(lib().openFace(path)), unknownFileFormat)
 
 @test("a font cut short is Err")
 truncatedFont()
   val path = s"${scratch()}/short.ttf"
-  assert(fs.writeBytes(path, bytesOf(kaiseiPath).slice(0, 100)).isOk())
+  assert(fs.writeBytes(path, bytesOf(kaiseiPath).slice(0, 100)).isOk)
   assert(code(lib().openFace(path)) != 0)
 
 @test("an index past the file's faces is Err, FreeType's invalid-argument")
@@ -122,7 +122,7 @@ indexPastFaces()
 @test("a path holding non-ASCII characters is passed as UTF-8")
 unicodePath()
   val path = s"${scratch()}/かいせい-é.ttf"
-  assert(fs.writeBytes(path, bytesOf(ptSansPath)).isOk())
+  assert(fs.writeBytes(path, bytesOf(ptSansPath)).isOk)
   assertEq(made(lib().openFace(path)).familyName(), Some("PT Sans"))
 
 @test(should_trap: "holds a NUL")

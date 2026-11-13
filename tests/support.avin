@@ -51,7 +51,7 @@ blockOf(path: string) -> ByteBlock = blockOfBytes(bytesOf(path))
 
 // `bytes` copied into a new block.
 blockOfBytes(bytes: Array[byte]) -> ByteBlock =
-  val block = ByteBlock(bytes.length())
+  val block = ByteBlock(bytes.length)
   block.write(0, bytes)
   block
 
@@ -62,7 +62,7 @@ scratch() -> string = fs.createTempDir("avin-freetype").getOrElse(fail("no tempo
 churn() -> int =
   var total = 0
   for i in 0 ..< 2000
-    total += [i, i + 1, i + 2].length()
+    total += [i, i + 1, i + 2].length
   total
 
 // The big-endian 16-bit number at `at`, unsigned.

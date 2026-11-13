@@ -5,7 +5,7 @@ from files and from memory, glyphs loaded and rendered, kerning, raw SFNT tables
 named instances of variable fonts. The package binds FreeType's C library directly through Avin's C
 bindings, which check every binding against FreeType's own headers when the program is built.
 
-Needs Avin 0.0.18 or later.
+Needs Avin 0.0.20 or later.
 
 ## Installing FreeType
 
