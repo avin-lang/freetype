@@ -3,17 +3,7 @@ module tests
 // Sizes, character maps and glyphs: a face set to a size, its glyphs looked up, loaded and rendered,
 // and the measures of what the glyph slot holds.
 import dev.avinlang.freetype.{
-  Big5,
-  Face,
-  LoadFlags,
-  Lcd,
-  LcdV,
-  Light,
-  Mono,
-  Sdf,
-  Normal,
-  Unicode,
-  invalidArgument
+  Big5, Face, LoadFlags, Lcd, LcdV, Light, Mono, Sdf, Normal, Unicode, invalidArgument
 }
 
 // The face of `path` with the glyph of `c` loaded and rendered at `pixels` pixels high.

@@ -4,15 +4,7 @@ module tests
 // glyph format read as enum mirrors, the character maps' encodings, and a glyph rendered by FreeType
 // compared pixel for pixel with a known rendering.
 import dev.avinlang.freetype.{
-  Bgra,
-  Glyph,
-  GlyphFormat,
-  Gray,
-  LoadFlags,
-  Outline,
-  PixelMode,
-  RenderMode,
-  Unicode
+  Bgra, Glyph, GlyphFormat, Gray, LoadFlags, Outline, PixelMode, RenderMode, Unicode
 }
 
 // PT Sans's `A` at 12 pixels, unhinted and rendered with 256 levels of grey, as FreeType draws it:

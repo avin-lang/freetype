@@ -2,15 +2,7 @@ module tests
 
 // Libraries: made, versioned, closed; FreeType's error codes and their descriptions.
 import dev.avinlang.freetype.{
-  Failed,
-  cannotOpenResource,
-  describe,
-  errorString,
-  invalidArgument,
-  library,
-  ok,
-  tableMissing,
-  unknownFileFormat
+  Failed, cannotOpenResource, describe, errorString, invalidArgument, library, ok, tableMissing, unknownFileFormat
 }
 
 @test("a library is made, and reports FreeType 2")

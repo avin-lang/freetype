@@ -5,16 +5,8 @@ module tests
 import avin.fs
 
 import dev.avinlang.freetype.{
-  BBox,
-  cannotOpenResource,
-  faceFlagHorizontal,
-  faceFlagKerning,
-  faceFlagScalable,
-  faceFlagSfnt,
-  invalidArgument,
-  styleFlagBold,
-  styleFlagItalic,
-  unknownFileFormat
+  BBox, cannotOpenResource, faceFlagHorizontal, faceFlagKerning, faceFlagScalable, faceFlagSfnt, invalidArgument,
+  styleFlagBold, styleFlagItalic, unknownFileFormat
 }
 
 @test("Kaisei Decol's names, counts and index")
